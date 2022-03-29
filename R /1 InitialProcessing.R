@@ -38,68 +38,62 @@ remove(files, filenames, i)
 #Check for missing values
 sapply(all_data, function(x) sum(is.na(x)))
 #Check for uniqueness of SO Numbers
-check_unique_so <- all_data %>%
-  group_by(SoNum) %>%
+check_so <- all_data %>% group_by(SoNum) %>%
   summarise(DOBs = n_distinct(DOB), Genders = n_distinct(Gender),
             Races = n_distinct(Race))
-sapply(check_unique_so, function(x) sum(x > 1))
-remove(check_unique_so)
+sapply(check_so, function(x) sum(x > 1))
+remove(check_so)
+#Select most recent DOB/Race and initial Gender for those with multiple
+all_data <- all_data %>% group_by(SoNum) %>%
+  mutate(DOB = last(DOB), Race = last(Race), Gender = first(Gender)) %>% ungroup
 #Check for reasonableness of data
 summary(all_data$DOB)
 table(all_data$Gender)
 table(all_data$Race)
+#Check for data gaps
+timeGaps <- all_data[with(all_data, order(SoNum, Date)), ]
+timeGaps <- timeGaps %>% group_by(Date) %>% mutate(Day = cur_group_id()) %>%
+  ungroup()
+timeGaps <- which(timeGaps$SoNum==lag(timeGaps$SoNum) &
+                    timeGaps$Day != (lag(timeGaps$Day) + 1))
 
 #For now: Separate out women and men with special locations
-data_m <-subset(all_data, Gender == "M")
-data_f <-subset(all_data, Gender == "F")
+#And move anyone coded as M and F into the M data frame
+data_m <- subset(all_data, Gender == "M")
+data_f <- subset(all_data, Gender == "F")
+data_m <- rbind(data_m, data_f[data_f$SoNum %in% data_m$SoNum,])
+data_f<- data_f[!(data_f$SoNum %in% data_m$SoNum),]
 data_m$Location <- gsub(" - Male", "", data_m$Location)
 data_f$Location <- gsub(" - Female", "", data_f$Location)
 if (nrow(all_data) != (nrow(data_f) + nrow(data_m))){
   warning("Check for missing values in the Gender column")}
-data_m_standardLoc <- data_m[!grepl("[A-M]|[O-R]|[T-Z]|[a-z]",
-                                    data_m$Location), ]
-data_m_specialLoc <- data_m[grepl("[A-M]|[O-R]|[T-Z]|[a-z]", data_m$Location), ]
+m_stdLoc <- data_m[!grepl("[A-M]|[O-R]|[T-Z]|[a-z]", data_m$Location), ]
+m_specialLoc <- data_m[grepl("[A-M]|[O-R]|[T-Z]|[a-z]", data_m$Location), ]
 remove(data_m)
-#Do other things (TBD)
 
-
+#Check if any SO Numbers got split across data frames
+std_split <- subset(m_stdLoc, m_stdLoc$SoNum %in% m_specialLoc$SoNum)
+std_split <- std_split[!duplicated(std_split$SoNum),]
 
 #Continuing only with men with standard locations...
 
 #Calculate how many times each person appears in the data and in how many places
-counts <- data_m_standardLoc %>% group_by(SoNum) %>%
+ids <- m_stdLoc %>% group_by(SoNum) %>%
   summarise(DaysOfData = n(), FirstDate = min(Date), LastDate = max(Date),
             NumLocs = n_distinct(Location), DOB = last(DOB),
-            Gender = last(Gender), Race = last(Race))
-counts$Duration <- counts$LastDate - counts$FirstDate + 1
+            Gender = first(Gender), Race = last(Race))
+ids$id <- 1:nrow(ids)
+ids$Duration <- ids$LastDate - ids$FirstDate + 1
 
 #Split the cell location column into floor, tower, block, and cell
-data_m_standardLoc <- separate(data = data_m_standardLoc, col = 5,
+m_stdLoc <- separate(data = m_stdLoc, col = 5,
                                into = c("Floor", "Tower", "Block", "Cell"),
                                sep = c(1, 2, 3))
 
 #Contacts by Block and Cell
-blockContacts_temp <- data_m_standardLoc %>%
-  group_by(Date, Floor, Tower, Block) %>%
-    summarise(BlockContacts = n_distinct(SoNum))
-cellContacts_temp <- data_m_standardLoc %>%
-  group_by(Date, Floor, Tower, Block, Cell) %>%
-    summarise(CellContacts = n_distinct(SoNum))
-
-blockContacts <- merge(data_m_standardLoc, blockContacts_temp,
-              by = c("Date", "Floor", "Tower", "Block"))[,
-                                        union(names(data_m_standardLoc),
-                                              names(blockContacts_temp))]
-blockContacts$BlockContacts <- blockContacts$BlockContacts - 1
-contacts <- merge(blockContacts, cellContacts_temp,
-                  by = c("Date", "Floor", "Tower", "Block", "Cell"))[,
-                                            union(names(blockContacts),
-                                                names(cellContacts_temp))]
+contacts <- m_stdLoc %>% group_by(Date, Floor, Tower, Block) %>%
+  mutate(BlockContacts = n_distinct(SoNum)) %>% ungroup()
+contacts <- contacts %>% group_by(Date, Floor, Tower, Block, Cell) %>%
+  mutate(CellContacts = n_distinct(SoNum)) %>% ungroup()
+contacts$BlockContacts <- contacts$BlockContacts - 1
 contacts$CellContacts <- contacts$CellContacts - 1
-remove(blockContacts_temp, cellContacts_temp, blockContacts)
-
-contacts$CSum_Block <- ave(contacts$BlockContacts, contacts$SoNum, FUN=cumsum)
-contacts$CSum_Cell <- ave(contacts$CellContacts, contacts$SoNum, FUN=cumsum)
-
-
-

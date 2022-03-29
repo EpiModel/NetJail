@@ -1,0 +1,844 @@
+---
+title: "FCJ Cell Level Network Analysis"
+author: "Karina Wallrafen-Sam"
+date: "3/24/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Step 0: Load in data and conduct initial processing/cleaning
+
+We start by loading all excel files from the data/input/FJC folder into a single large data frame, `all_data`. Although some of the excel files include their data split into multiple sheets (one for each floor/tower), all of them start with the full roster in a single sheet, so we disregard the extra sheets.
+
+When we check for the uniqueness of the SO Numbers, we see that 6 SO Numbers are associated with multiple DOBs and 1 with multiple Races. For these SO Numbers, we consider the DOB/Race from the most recent roster to be the 'truth'. Also, SO Number P01007978 has Gender = “M” from 10/27/2021 to 01/31/2022 and Gender = “F” on 02/04/2022. Since this person is always located in parts of the jail that house male residents, we will consider Gender = "M" to be the 'truth'. We adjust the data accordingly for these 8 residents. 
+
+For now, we subset out all data rows that contain female residents and/or locations that do not follow the Floor + Tower + Block + Cell pattern. (This data is placed into two data frames, `data_f` and `m_specialLoc`, which we ignore for now but will need to add back in eventually.) We proceed only with data rows that contain male residents and 'standard' locations, which we put into a smaller data frame called `m_stdLoc`. About 500 SO Numbers in `m_stdLoc` also appear in `m_specialLoc`. (For example, many residents spend one day in Intake, a 'special' location, before going to a standard cell). Since we are ignoring `m_specialLoc` for now, any results regarding turnover rates, durations of stay, etc. should be taken with a grain of salt. 
+
+At the end of this step, we have two data frames that we will use going forward: `m_stdLoc` and `ids`. `ids` lists out the 4589 residents who ever appear in `m_stdLoc` and assigns them each an `id` between 1 and 4589. There's a one-to-one mapping from SO Number to `id`, making them interchangeable, but we will use `id` from now on for simplicity. 
+
+```{r, message = FALSE}
+library(readxl)
+library(tidyr)
+library(dplyr)
+
+#Load all excel files from the data/input/FJC folder into the files list
+filenames <- list.files("data/input/FJC", pattern="*.xlsx", full.names=TRUE)
+files <- lapply(filenames, read_excel)
+#Name the sub-lists (one for each file) based on the file names
+names(files) <- substr(gsub(" ", "_",
+                            gsub("\\(", "",
+                                 gsub("\\)", "", filenames))), 16, 40)
+
+#Basic data cleaning
+for (i in seq_along(files)){
+  #Keep only the SO Number, DOB, Gender, Race, and Cell/Cell Location columns
+  files[[i]] <- files[[i]][ , grepl( "So|SO|DOB|Gender|Race|Cell" ,
+                                     names( files[[i]] ) ) ]
+  #Check that each sub-list has the right number of columns
+  if (ncol(files[[i]]) != 5){
+    stop("Wrong number of columns selected")
+  }
+  #Add a column for the date of data collection
+  files[[i]]$Date <- substr(names(files)[i], 18, 25)
+  #Standardize column names and date formats
+  colnames(files[[i]])[grepl('So|SO',colnames(files[[i]]))] <- 'SoNum'
+  colnames(files[[i]])[grepl('Cell',colnames(files[[i]]))] <- 'Location'
+  files[[i]]$Date <- as.Date(files[[i]]$Date, "%Y%m%d")
+  files[[i]]$DOB <- as.Date(files[[i]]$DOB)
+}
+
+#Concatenate the sub-lists into one long data frame
+all_data = do.call(rbind, files)
+remove(files, filenames, i)
+
+#Check for missing values
+sapply(all_data, function(x) sum(is.na(x)))
+#Check for uniqueness of SO Numbers
+check_so <- all_data %>% group_by(SoNum) %>%
+  summarise(DOBs = n_distinct(DOB), Genders = n_distinct(Gender),
+            Races = n_distinct(Race))
+sapply(check_so, function(x) sum(x > 1))
+remove(check_so)
+#Select most recent DOB/Race and initial Gender for those with multiple
+all_data <- all_data %>% group_by(SoNum) %>%
+  mutate(DOB = last(DOB), Race = last(Race), Gender = first(Gender)) %>% ungroup
+#Check for reasonableness of data
+summary(all_data$DOB)
+table(all_data$Gender)
+table(all_data$Race)
+#Check for data gaps
+timeGaps <- all_data[with(all_data, order(SoNum, Date)), ]
+timeGaps <- timeGaps %>% group_by(Date) %>% mutate(Day = cur_group_id()) %>%
+  ungroup()
+timeGaps <- which(timeGaps$SoNum==lag(timeGaps$SoNum) &
+                    timeGaps$Day != (lag(timeGaps$Day) + 1))
+
+#For now: Separate out women and men with special locations
+data_m <- subset(all_data, Gender == "M")
+data_f <- subset(all_data, Gender == "F")
+data_m$Location <- gsub(" - Male", "", data_m$Location)
+data_f$Location <- gsub(" - Female", "", data_f$Location)
+if (nrow(all_data) != (nrow(data_f) + nrow(data_m))){
+  warning("Check for missing values in the Gender column")}
+m_stdLoc <- data_m[!grepl("[A-M]|[O-R]|[T-Z]|[a-z]", data_m$Location), ]
+m_specialLoc <- data_m[grepl("[A-M]|[O-R]|[T-Z]|[a-z]", data_m$Location), ]
+remove(data_m)
+
+#Check if any SO Numbers got split across data frames
+std_split <- subset(m_stdLoc, m_stdLoc$SoNum %in% m_specialLoc$SoNum)
+std_split <- std_split[!duplicated(std_split$SoNum),]
+
+#Continuing only with men with standard locations...
+
+#Calculate how many times each person appears in the data and in how many places
+ids <- m_stdLoc %>% group_by(SoNum) %>%
+  summarise(DaysOfData = n(), FirstDate = min(Date), LastDate = max(Date),
+            NumLocs = n_distinct(Location), DOB = last(DOB),
+            Gender = first(Gender), Race = last(Race))
+ids$id <- 1:nrow(ids)
+ids$Duration <- ids$LastDate - ids$FirstDate + 1
+
+#Split the cell location column into floor, tower, block, and cell
+m_stdLoc <- separate(data = m_stdLoc, col = 5,
+                               into = c("Floor", "Tower", "Block", "Cell"),
+                               sep = c(1, 2, 3))
+
+#Contacts by Block and Cell
+contacts <- m_stdLoc %>% group_by(Date, Floor, Tower, Block) %>%
+  mutate(BlockContacts = n_distinct(SoNum)) %>% ungroup()
+contacts <- contacts %>% group_by(Date, Floor, Tower, Block, Cell) %>%
+  mutate(CellContacts = n_distinct(SoNum)) %>% ungroup()
+contacts$BlockContacts <- contacts$BlockContacts - 1
+contacts$CellContacts <- contacts$CellContacts - 1
+```
+
+## Step 1: Create an edge list of cell-level edges
+
+We create `dates`, which assigns two numerical values to each date for which we have data: `DayIndex` and `DayNum`. `DayIndex` is basically the roster number and `DayNum` tells us how many days have passed since October 27th, 2021 -- the first day for which we have data. For example, for December 1st, 2021, `DayIndex` is 2 (since this is our second roster) and `DayNum` is 36.
+
+In order to list out all cell-level edges, we start by merging `cDailyLoc` (which is basically `m_stdLoc` but with the columns reorganized) with itself and only keep rows where `id.x` is less than `id.y`. This gives us a list of pairs of residents who were ever in the same cell on the same day. We then create a counter that increments every time (a) the pairing changes, (b) there's a time gap, OR (c) the location changes. (a) is self-explanatory. (b) means that if Person A and Person B were in a cell together in Roster 1, NOT in a cell together in Roster 2, and in a cell together again in Roster 3 (on 12/08), then we create one edge between A and B that is present on Day 1 (10/27) and gone on Day 2 (10/28) and another that forms on Day 43 (12/08). (c) means that if Person A and Person B were in Cell 1 together in Roster 1 (on 10/27) and in Cell 2 together in Roster 2 (on 12/01), we create one edge between A and B that is present on Day 1 (10/27) and gone on Day 2 (10/28) and another that forms on Day 36 (12/01). 
+
+Once we have this counter, creating the edge list is straightforward: we group on the counter and list out the id for the head, the id for the tail, the day number on which the edge is first present, and the day number on which the edge is last present. We also note if edges are left-censored and/or right-censored. This information is stored in `cEdges`. 
+
+```{r, message = FALSE}
+#Assign a numerical id to each date
+dates <- unique(contacts[c("Date")])
+dates$DayIndex <- 1:nrow(dates)
+dates <- dates %>% mutate(DayNum = as.numeric(difftime(Date, lag(Date,1))))
+dates$DayNum[1] <- 1
+dates$DayNum <- cumsum(dates$DayNum)
+
+#Merge in ids; combine floor, tower, and block into one column
+cDailyLoc <- merge(m_stdLoc, ids, by = "SoNum")[,
+                            c("id", "Date", "Floor", "Tower", "Block", "Cell")]
+cDailyLoc$loc <- paste(cDailyLoc$Floor, cDailyLoc$Tower, cDailyLoc$Block,
+                       cDailyLoc$Cell)
+cDailyLoc <- cDailyLoc[ , c("id", "Date", "loc")]
+
+#Create pairs of residents who were ever in the same cell on the same day
+cPairs <- merge(cDailyLoc, cDailyLoc, by = c("Date", "loc"))
+cPairs <- subset(cPairs, (id.x < id.y))
+cPairs <- merge(cPairs, dates, by = "Date")
+
+#Flag rows if the pair is the same as the previous row and there's no time gap
+cPairs <- cPairs[with(cPairs, order(id.x, id.y, DayIndex)), ]
+ind.c <- which(cPairs$id.x==lag(cPairs$id.x) & cPairs$id.y==lag(cPairs$id.y) &
+                 cPairs$loc==lag(cPairs$loc) &
+                 cPairs$DayIndex==(lag(cPairs$DayIndex) + 1))
+cPairs$newContact <- "True"
+cPairs[ind.c, ]$newContact <- "False"
+
+#Create a counter that increments for every new contact; remove helper col
+cPairs$contactCounter <- cumsum(cPairs$newContact == "True")
+cPairs$newContact <- NULL
+
+#List out each contact w/head, tail, start, end, and censoring flags
+cEdges <- cPairs %>% group_by(contactCounter) %>%
+  summarise(head = first(id.x), tail = first(id.y),
+            firstTime = min(DayNum), lastTime = max(DayNum),
+            location = first(loc))
+cEdges$contactCounter <- NULL
+cEdges$startCensored <- "N"
+cEdges$startCensored[cEdges$firstTime == min(cEdges$firstTime) ] <- "Y"
+cEdges$endCensored <- "N"
+cEdges$endCensored[cEdges$lastTime == max(cEdges$lastTime) ] <- "Y"
+
+remove(cPairs, ind.c)
+```
+
+## Step 2: Identify when nodes are active and in known locations
+
+We create one data frame, `cLocs`, that lists out timeframes when we know (or believe) a particular person was in a particular location, and another, `activeDays`, that lists out timeframes when we know (or believe) a particular person was in the jail (in a standard location) at all. Our general approach is that if something is the same in two consecutive rosters, then we assume it was also the same in the time between the two rosters.
+
+For example, say that Person A is in Cell 1 in Roster 1 (on 10/27, or Day 1) and is still in Cell 1 in Roster 2 (on 12/01, or Day 36). Then we assume Person A was (a) 'active' (i.e., in the jail) and (b) located in Cell 1 the whole time between Day 1 and Day 36, too. If Person A is in Cell 1 in Roster 1 (on 10/27, or Day 1) and is in Cell 2 in Roster 2 (on 12/01, or Day 36), then we assume that Person A was also 'active' on Days 2 - 35 but we do not assume anything about their particular location during the jail during that time.
+
+For a real example, consider SO Number P00069424 (node 10). This person is in Roster 1 (on 10/27, or Day 1), Roster 2 (on 12/01, or Day 36), Roster 22 on (1/21, or Day 87), Roster 23 on (1/26, or Day 92), Roster 24 (on 1/31, or Day 97), and Roster 25 (on 02/04, or Day 101). They are in 3N518 in Rosters 1 and 2, then in 2S200 in Roster 22, in 2S210 for Roster 23, in 4N200 for Roster 24, and in 4N212 for Roster 25. 
+
+We thus consider them 'active' until Day 36 (inclusive) and from Day 87 on. We consider them to be 'in' 3N518 until Day 36 (inclusive), 'in' 2S200 on Day 87 only, 'in' 2S210 on Day 92 only, 'in' 4N200 on Day 97 only, and 'in' 4N212 for Day 101 only. This means that on Day 90, for example, node 10 is active but does not have an active location. 
+
+```{r, message = FALSE}
+#Create a df that lists out known spells in each location for each id
+#People in the same cell in consecutive rosters are assumed to have stayed in
+#the same cell between those two rosters
+cLocs <- merge(cDailyLoc, dates, by = "Date")
+cLocs <- cLocs[with(cLocs, order(id, DayIndex)), ]
+ind <- which(cLocs$id==lag(cLocs$id) & cLocs$loc==lag(cLocs$loc) &
+               cLocs$DayIndex==(lag(cLocs$DayIndex) + 1))
+cLocs$newLoc <- "True"
+cLocs[ind, ]$newLoc <- "False"
+cLocs$locCounter <- cumsum(cLocs$newLoc == "True")
+cLocs$newLoc <- NULL
+remove(ind)
+cLocs <- cLocs %>% group_by(locCounter) %>%
+  summarise(id = first(id), loc = first(loc), onset = min(DayNum),
+            terminus = max(DayNum) + 1)
+cLocs$locCounter <- NULL
+cLocs$onset[cLocs$onset == min(cLocs$onset) ] <- -Inf
+cLocs$terminus[cLocs$terminus == max(cLocs$terminus) ] <- Inf
+cLocs <- transform(cLocs, id = as.numeric(id))
+
+#Create a df of spells of presence in jail for each id
+#People who appear in consecutive rosters are assumed to have been in the jail
+#between those two rosters (even if their cell changed)
+activeDays <- merge(cDailyLoc, dates, by = "Date")
+activeDays <- activeDays[with(activeDays, order(id, DayIndex)), ]
+ind <- which(activeDays$id==lag(activeDays$id) &
+            activeDays$DayIndex == (lag(activeDays$DayIndex) + 1))
+activeDays$newStay <- "True"
+activeDays[ind, ]$newStay <- "False"
+activeDays$stayCounter <- cumsum(activeDays$newStay == "True")
+activeDays$newStay <- NULL
+remove(ind)
+activeDays <- activeDays %>% group_by(stayCounter) %>%
+  summarise(id = first(id), onset = min(DayNum), terminus = max(DayNum) + 1)
+activeDays$stayCounter <- NULL
+activeDays$onset[activeDays$onset == min(activeDays$onset) ] <- -Inf
+activeDays$terminus[activeDays$terminus == max(activeDays$terminus) ] <- Inf
+```
+
+## Step 3: Create a dynamic network object
+
+In order to create a `networkDynamic` object, we first need to manipulate `cEdges` a bit. We replace the column `lastTime` (the last day on which the edge is present) with `terminus` (the day *after* last day on which the edge is present, which is the day on which the edge should dissolve) and change the column name `startTime` to `onset` for consistency (it's the same column, though). We also change the `onset` value to `-Inf` for left-censored edges and the `terminus` value to `Inf` for right-censored edges (this is probably unnecessary).
+
+We then need to create a static network that's the same size as the dynamic network we're going to create. This is very annoying because it makes the code much slower for some reason, but it seems to be the only way to specify that our network is not directed, which is important. 
+
+Then we're ready to create our `networkDynamic` object. We use the `cLocs` data frame we created in Step 2 to create a dynamic (TEA) node attribute called `location`. We also set age, race, and gender as (static) vertex attributes. (Each person's age is calculated as of the first day that they appear in the data. Some of the residents do have a birthday during the October - February period we're considering, but we ignore that.) Finally, we activate nodes based on the data in `activeDays`. 
+
+```{r, message = FALSE}
+library(EpiModel)
+
+#Adjust data frame of edges
+cEdges <- transform(cEdges, onset = as.numeric(firstTime))
+cEdges <- within(cEdges, onset[startCensored == 'Y'] <- -Inf)
+cEdges <- within(cEdges, lastTime[endCensored == 'Y'] <- Inf)
+cEdges$terminus <- cEdges$lastTime + 1
+cEdges$firstTime <- NULL
+cEdges$lastTime <- NULL
+
+#Create a dynamic network
+cNW <- network(cEdges[cEdges$onset == -Inf, c("head", "tail")],
+               directed = FALSE, vertices = data.frame(name = ids$id))
+cDynNW <- networkDynamic(base.net = cNW,
+                         vertex.spells =
+                            cLocs[, c("onset", "terminus", "id", "loc")],
+                          edge.spells =
+                            cEdges[ , c("onset", "terminus", "tail", "head")],
+                          create.TEAs = TRUE,
+                          vertex.TEA.names = c("location"))
+
+#Set vertex attributes
+ids$InitialAge <- as.integer((ids$FirstDate - ids$DOB)/365.25)
+cDynNW <- set.vertex.attribute(cDynNW, "Race", ids$Race)
+cDynNW <- set.vertex.attribute(cDynNW, "Age", ids$InitialAge)
+cDynNW <- set.vertex.attribute(cDynNW, "Gender", ids$Gender)
+
+#Activate vertices
+cDynNW <- activate.vertices(x = cDynNW, onset = activeDays$onset,
+                            terminus = activeDays$terminus,
+                            v = activeDays$id)
+```
+
+
+## Step 4: Calculate overall degree distribution
+
+To calculate the degree distribution over time, we extract the network at each time point for which we have a roster (Day 1, Day 36, etc.) and use the `degreedist()` function on the extracted networks. We plot the degree distribution at 6 selected time points (as close to the beginning and middle of each month as possible.) We also calculate the mean degree at each time point for which we have a roster.
+
+`cOverallMeanDeg` is a simple, un-weighted average of these 25 mean degree values (each day is weighted equally, without regard for changing network size.) `cSubsetMeanDeg`, similarly, is a simple, un-weighted average of the 11 mean degree values from January 11th to January 21st. 
+
+```{r, message = FALSE}
+#Overall degree distribution at each time point
+for (i in seq_len(nrow(dates))){
+  currentNW <- as.network(network.extract(cDynNW, at = dates$DayNum[i]))
+  dist <- degreedist(currentNW, print = FALSE)
+  dist <- data.frame(deg = as.integer(substr(names(dist), 7, 8)),
+                     num = as.integer(dist))
+  names(dist)[names(dist) == "num"] <- toString(dates$Date[i])
+  if (i == 1) {
+    cDegDists <- dist
+  } else {
+    cDegDists <- merge(cDegDists, dist, by = "deg", all = TRUE)
+  }
+}
+remove(dist, i, currentNW)
+
+#Histograms:
+par(mfrow = c(3,2))
+days <- c(1, 2, 5, 11, 17, 25) #Day indices, not day numbers
+for (i in seq_along(days)) {
+  barplot(cDegDists[, (days[i] + 1)], names.arg = cDegDists$deg, 
+          xlab = "Degree", ylab = "Frequency", 
+          main = paste("Degree Distribution on", dates$Date[days[i]], sep=" "))
+}
+
+#Mean degree at each time point
+cMeanDeg <- lapply(cDegDists[ , -1], function(x)
+  sum(cDegDists$deg * x, na.rm = TRUE)/sum(x, na.rm = TRUE))
+cMeanDeg <- do.call(rbind, cMeanDeg)
+cMeanDeg <- data.frame(dates$Date, cMeanDeg)
+par(mfrow = c(1,1))
+plot(cMeanDeg, xlab = "Date", ylab = "Mean Degree",
+     main = "Mean degree over time")
+
+#Mean degree averaged across all days of data
+cOverallMeanDeg <- mean(cMeanDeg$cMeanDeg)
+cOverallMeanDeg
+
+#Mean degree averaged across the daily subset of data
+cSubsetMeanDeg <- mean(cMeanDeg$cMeanDeg[12:22])
+cSubsetMeanDeg
+```
+
+## Step 5: Calculate degree distribution by attribute
+
+In Step 5, we perform the same operations as in Step 4, but broken down by Race (a fixed attribute), Age (which we are treating as a fixed attribute), and Floor (a time-varying attribute, which we extract at each time point for which we have a roster). 
+
+```{r, message = FALSE}
+#Degree distribution by attribute: floor, age, race
+for (i in seq_len(nrow(dates))){
+  currNW <- as.network(network.extract(cDynNW, at = dates$DayNum[i]))
+  currNodes <- data.frame(id = get.vertex.attribute(currNW, "vertex.names"),
+                          race = get.vertex.attribute(currNW, "Race"),
+                          age = get.vertex.attribute(currNW, "Age"),
+                          floor = get.vertex.attribute.active(currNW, "location",
+                                                        at = dates$DayNum[i]),
+                          degree = get_degree(currNW))
+  currNodes$floor <- substr(currNodes$floor, 0, 1)
+
+  dist_f <- currNodes %>% group_by(floor, degree) %>% summarise(count = n())
+  dist_r <- currNodes %>% group_by(race, degree) %>% summarise(count = n())
+  dist_a <- currNodes %>% group_by(age, degree) %>% summarise(count = n())
+
+  names(dist_f)[names(dist_f) == "count"] <- toString(dates$Date[i])
+  names(dist_r)[names(dist_r) == "count"] <- toString(dates$Date[i])
+  names(dist_a)[names(dist_a) == "count"] <- toString(dates$Date[i])
+
+  if (i == 1){
+    cDegDists_floor <- dist_f
+    cDegDists_race <- dist_r
+    cDegDists_age <- dist_a
+  } else {
+    cDegDists_floor <- merge(cDegDists_floor, dist_f, by = c("floor", "degree"),
+                             all = TRUE)
+    cDegDists_race <- merge(cDegDists_race, dist_r, by = c("race", "degree"),
+                            all = TRUE)
+    cDegDists_age <- merge(cDegDists_age, dist_a, by = c("age", "degree"),
+                           all = TRUE)
+  }
+}
+remove(dist_f, dist_r, dist_a, currNW, currNodes)
+
+#Histograms of degree distribution by floor:
+par(mfrow = c(3,2))
+floors <- c(2, 7)
+for (j in seq_along(floors)) {
+  for (i in seq_along(days)) {
+    barplot(cDegDists_floor[cDegDists_floor$floor == floors[j], ][, (days[i] + 2)],
+        names.arg = cDegDists_floor[cDegDists_floor$floor == floors[j], ]$degree,
+        xlab = "Degree", ylab = "Frequency",
+        main = paste("Degree Distribution on", dates$Date[days[i]], "on Floor",
+                     floors[j], sep=" "))
+  }
+}
+
+#Histograms of degree distribution by race:
+par(mfrow = c(3,2))
+races <- c("Black", "White")
+for (j in seq_along(races)) {
+  for (i in seq_along(days)) {
+    barplot(cDegDists_race[cDegDists_race$race == races[j], ][, (days[i] + 2)],
+        names.arg = cDegDists_race[cDegDists_race$race == races[j], ]$degree,
+        xlab = "Degree", ylab = "Frequency",
+        main = paste("Degree Dist. on", dates$Date[days[i]], "for",
+                     races[j], "Residents", sep=" "))
+  }
+}
+
+#Histograms of degree distribution by age:
+par(mfrow = c(3,2))
+ages <- c(30, 45)
+for (j in seq_along(ages)) {
+  for (i in seq_along(days)) {
+    barplot(cDegDists_age[cDegDists_age$age == ages[j], ][, (days[i] + 2)],
+        names.arg = cDegDists_age[cDegDists_age$age == ages[j], ]$degree,
+        xlab = "Degree", ylab = "Frequency",
+        main = paste("Degree Dist. on", dates$Date[days[i]],
+                     "for", ages[j], "Yr. Old Residents", sep=" "))
+  }
+}
+
+#Mean degree by floor at each time point
+cDegDists_floor2 <- gather(cDegDists_floor, key = "Date", value = "Number", 
+                          -floor, -degree)
+cDegDists_floor2$Date <- as.Date(cDegDists_floor2$Date)
+cMeanDeg_floor <- cDegDists_floor2 %>% group_by(floor, Date) %>% 
+  summarise(MeanDeg = sum(degree * Number, na.rm = TRUE) / 
+              sum(Number, na.rm = TRUE))
+par(mfrow = c(2,2))
+floors <- 1:7
+for (i in seq_along(floors)) {
+    plot(cMeanDeg_floor[cMeanDeg_floor$floor == floors[i], ]$Date, 
+         y = cMeanDeg_floor[cMeanDeg_floor$floor == floors[i], ]$MeanDeg,
+         xlab = "Date", ylab = "Mean Degree", 
+         main = paste("Mean degree over time for floor", floors[i], sep=" "),
+         ylim = c(0.9, 2.9))
+  }
+remove(cDegDists_floor2)
+
+#Mean degree by race at each time point
+cDegDists_race2 <- gather(cDegDists_race, key = "Date", value = "Number", 
+                          -race, -degree)
+cDegDists_race2$Date <- as.Date(cDegDists_race2$Date)
+cMeanDeg_race <- cDegDists_race2 %>% group_by(race, Date) %>% 
+  summarise(MeanDeg = sum(degree * Number, na.rm = TRUE) / 
+              sum(Number, na.rm = TRUE))
+cMeanDeg_race$MeanDeg[is.nan(cMeanDeg_race$MeanDeg)]<-NA
+par(mfrow = c(1,2))
+for (i in seq_along(races)) {
+    plot(cMeanDeg_race[cMeanDeg_race$race == races[i], ]$Date,
+     y = cMeanDeg_race[cMeanDeg_race$race == races[i], ]$MeanDeg,
+     xlab = "Date", ylab = "Mean Degree", 
+     main = paste("Mean Deg. over Time -", races[i], sep = " "),
+     ylim = c(1.3, 2.2))
+}
+remove(cDegDists_race2)
+  
+#Mean degree by age at each time point
+cDegDists_age2 <- gather(cDegDists_age, key = "Date", value = "Number", 
+                          -age, -degree)
+cDegDists_age2$Date <- as.Date(cDegDists_age2$Date)
+cMeanDeg_age <- cDegDists_age2 %>% group_by(age, Date) %>% 
+  summarise(MeanDeg = sum(degree * Number, na.rm = TRUE) / 
+              sum(Number, na.rm = TRUE))
+cMeanDeg_age$MeanDeg[is.nan(cMeanDeg_age$MeanDeg)]<-NA
+par(mfrow = c(1,2))
+for (i in seq_along(ages)) {
+    plot(cMeanDeg_age[cMeanDeg_age$age == ages[i], ]$Date,
+     y = cMeanDeg_age[cMeanDeg_age$age == ages[i], ]$MeanDeg,
+     xlab = "Date", ylab = "Mean Degree", 
+     main = paste("Mean Deg. over Time - Age", ages[i], 
+                  sep = " "), 
+     ylim = c(1.5, 2.7))
+  }
+remove(cDegDists_age2)
+
+#Mean degree by floor averaged across all data
+cOverallMeanDeg_floor <- cMeanDeg_floor %>% group_by(floor) %>% 
+  summarise(OverallMeanDeg = mean(MeanDeg))
+par(mfrow = c(1,1))
+plot(cOverallMeanDeg_floor, main = "Mean Degree (across all days) by floor")
+
+#Mean degree by race across all data 
+cOverallMeanDeg_race <- cMeanDeg_race %>% group_by(race) %>% 
+  summarise(OverallMeanDeg = mean(MeanDeg))
+print(cOverallMeanDeg_race)
+
+#Mean degree by age across all data
+cOverallMeanDeg_age <- cMeanDeg_age %>% group_by(age) %>% 
+  summarise(OverallMeanDeg = mean(MeanDeg))
+par(mfrow = c(1,1))
+plot(cOverallMeanDeg_age$age[!is.na(cOverallMeanDeg_age$OverallMeanDeg)],
+     cOverallMeanDeg_age$OverallMeanDeg[
+       !is.na(cOverallMeanDeg_age$OverallMeanDeg)], 
+     xlab = "age", ylab = "Mean Degree", 
+     main = "Mean Degree (across all days) by age")  
+
+#Mean degree by floor across the daily subset of data
+temp <- cMeanDeg_floor[cMeanDeg_floor$Date >= "2022-01-11" & 
+                         cMeanDeg_floor$Date <= "2022-01-21", ]
+cSubsetMeanDeg_floor <- temp %>% group_by(floor) %>% 
+  summarise(SubsetMeanDeg = mean(MeanDeg))
+remove(temp)
+par(mfrow = c(1,1))
+plot(cSubsetMeanDeg_floor, main = "Mean Degree (across daily subset) by floor")
+
+#Mean degree by race across the daily subset of data 
+temp <- cMeanDeg_race[cMeanDeg_race$Date >= "2022-01-11" & 
+                         cMeanDeg_race$Date <= "2022-01-21", ]
+cSubsetMeanDeg_race <- temp %>% group_by(race) %>% 
+  summarise(SubsetMeanDeg = mean(MeanDeg))
+remove(temp)
+print(cSubsetMeanDeg_race)
+
+#Mean degree by age across the daily subset of data
+temp <- cMeanDeg_age[cMeanDeg_age$Date >= "2022-01-11" & 
+                         cMeanDeg_age$Date <= "2022-01-21", ]
+cSubsetMeanDeg_age <- temp %>% group_by(age) %>% 
+  summarise(SubsetMeanDeg = mean(MeanDeg))
+remove(temp)
+par(mfrow = c(1,1))
+plot(cSubsetMeanDeg_age$age[!is.na(cSubsetMeanDeg_age$SubsetMeanDeg)],
+     cSubsetMeanDeg_age$SubsetMeanDeg[!is.na(cSubsetMeanDeg_age$SubsetMeanDeg)], 
+     xlab = "age", ylab = "Mean Degree", 
+     main = "Mean Degree (across daily subset) by age")  
+
+```
+
+## Step 6:
+Turnover rates within cells using daily data 
+Turnover rates within cells using all data
+Turnover rates within cells by attribute using daily data 
+Turnover rates within cells by attribute using all data
+
+Should be able to calculate from contacts df without doing anything too fancy?
+
+```{r, message = FALSE}
+
+```
+
+## Step 7: Estimate Turnover Rates
+
+In this section, we calculate turnover rates (into and out of the jail) overall and by attribute, for the whole dataset (Oct 27th - Feb 4th) and for the daily subset (Jan 11th - Jan 21st). We attempt adapt the DOJ's definition of "weekly turnover rate" ("The sum of weekly admissions and releases divided by the average daily population") since we do not have consistent weekly data. Instead, we calculate the following:
+
+(1) For the whole dataset, we add up the known admissions (i.e., the number of spells of activity, as defined in Step 2, that are not left-censored) and the known releases (i.e., the number of spells of activity, as defined in Step 2, that are not right-censored). These numbers include repeat admissions and releases. We add these numbers together and divide the result by the average active network size (i.e., the average number of residents in the jail across the 25 days for which we have data). Note that the numerator is probably significantly underestimated (for example, anyone admitted and released during the month of November is not counted). This is an (under)estimate of the 101-day turnover rate. We divide by 101 days for scaling purposes (so that we can compare our results for the whole dataset to our results for the daily subset). This represents, roughly, the number of daily admissions and releases per resident. 
+
+(2) For the daily subset, we look only at Jan 11th to Jan 21st. We do this by taking a subset of `activeDays` that only includes spells whose first day was on or before Jan 21st (so `activeDays$onset <= 87`) AND whose last day was on or after Jan 11th (so `activeDays$terminus > 77`, since `terminus` is the first day on which the spell is gone, i.e., the day after its last day). We consider spells left-censored if they are already there on Jan 11th (so `activeDays_s$onset <= 77`), and we consider spells right-censored if their last day is on or after Jan 21st, meaning that their terminus is on or after Jan 22nd (so `activeDays_s$terminus > 87`). Using this data, we perform the same calculations (counting up admissions and releases, finding the average active network size, and calculating the 11-day turnover rate). We then divide by 11 days for scaling purposes.
+
+We perform the above calculations overall and broken down by age, race, and floor. The calculations by age and race are a matter of straightforward subsetting (since age and race are static attributed); the calculations by floor are a little more involved. (For every non-left-censored spell of activity (i.e., admission), we check what floor the resident was in on the first day in that spell. We consider this the floor that they were admitted to. Similarly, for every non-right-censored spell of activity (i.e., release), we check what floor the resident was in on the last day in that spell. We consider this the floor that they were released from. Then we can count up the admissions and releases by floor.)
+
+```{r, message = FALSE}
+allFloors <- unique(cDegDists_floor[["floor"]])           
+allRaces <- unique(cDegDists_race[["race"]])
+allAges <- unique(cDegDists_age[["age"]])
+rows <- c("Overall", paste("Floor", allFloors, sep=" "), allRaces, 
+          paste("Age", allAges, sep=" "))
+
+turnover_rates <- data.frame(Type = rows, Admissions=NA, Releases=NA, 
+                             AveragePop = NA, Turnover = NA, Admissions_s = NA, 
+                             Releases_s = NA, AveragePop_s = NA, 
+                             Turnover_s = NA)
+remove(rows)
+
+#ALL DATA - OVERALL
+#Calculate # of new admissions (including repeat admissions)
+admissions <- sum(activeDays$onset > -Inf)
+turnover_rates[turnover_rates$Type == "Overall", ]$Admissions <- admissions
+
+#Calculate # of releases
+releases <- sum(activeDays$terminus < Inf)
+turnover_rates[turnover_rates$Type == "Overall", ]$Releases <- releases
+
+#Calculate average daily population
+sizes <- c()
+for (i in seq_len(nrow(dates))) {
+  currentSize <- network.size.active(cDynNW, at = dates$DayNum[i])
+  sizes <- c(sizes, currentSize) 
+}
+avg_pop <- mean(sizes)
+turnover_rates[turnover_rates$Type == "Overall", ]$AveragePop <- avg_pop
+remove(admissions, releases, avg_pop, sizes, currentSize, i)
+
+
+#DAILY SUBSET - OVERALL
+#Calculate # of new admissions (including repeat admissions)
+activeDays_s <- activeDays[activeDays$onset <= 87 & activeDays$terminus > 77, ]
+activeDays_s$onset[activeDays_s$onset <= 77 ] <- -Inf
+activeDays_s$terminus[activeDays_s$terminus > 87 ] <- Inf
+admissions_s <- sum(activeDays_s$onset > -Inf)
+turnover_rates[turnover_rates$Type == "Overall", ]$Admissions_s <- admissions_s
+
+#Calculate # of releases
+releases_s <- sum(activeDays_s$terminus < Inf)
+turnover_rates[turnover_rates$Type == "Overall", ]$Releases_s <- releases_s
+
+#Calculate average daily population
+sizes_s <- c()
+for (i in 12:22) {
+  currentSize <- network.size.active(cDynNW, at = dates$DayNum[i])
+  sizes_s <- c(sizes_s, currentSize) 
+}
+avg_pop_s <- mean(sizes_s)
+turnover_rates[turnover_rates$Type == "Overall", ]$AveragePop_s <- avg_pop_s
+remove(i, admissions_s, releases_s, avg_pop_s, sizes_s, currentSize)
+
+
+
+#ALL DATA - BY RACE
+activeDays_race <- merge(activeDays, ids[ , c("id", "Race")], by = "id")
+for (i in seq_along(allRaces)) {
+  admissions <- sum(activeDays_race$Race == allRaces[i] & 
+                      activeDays_race$onset > -Inf)
+  releases <- sum(activeDays_race$Race == allRaces[i] & 
+                      activeDays_race$terminus < Inf)
+  avg_pop <- mean(colSums(cDegDists_race[cDegDists_race$race == 
+                                           allRaces[i],-c(1,2)], na.rm = TRUE))
+  turnover_rates[turnover_rates$Type == allRaces[i], ]$Admissions <- admissions
+  turnover_rates[turnover_rates$Type == allRaces[i], ]$Releases <- releases
+  turnover_rates[turnover_rates$Type == allRaces[i], ]$AveragePop <- avg_pop
+}
+remove(admissions, releases, avg_pop)
+
+
+#DAILY SUBSET - BY RACE
+activeDays_race_s <- merge(activeDays_s, ids[ , c("id", "Race")], by = "id")
+for (i in seq_along(allRaces)) {
+  admissions <- sum(activeDays_race_s$Race == allRaces[i] & 
+                      activeDays_race_s$onset > -Inf)
+  releases <- sum(activeDays_race_s$Race == allRaces[i] & 
+                      activeDays_race_s$terminus < Inf)
+  avg_pop <- mean(colSums(cDegDists_race[cDegDists_race$race == 
+                                           allRaces[i],14:24], na.rm = TRUE))
+  turnover_rates[turnover_rates$Type == allRaces[i], ]$Admissions_s <- 
+    admissions
+  turnover_rates[turnover_rates$Type == allRaces[i], ]$Releases_s <- releases
+  turnover_rates[turnover_rates$Type == allRaces[i], ]$AveragePop_s <- avg_pop
+}
+remove(admissions, releases, avg_pop, activeDays_race, activeDays_race_s)
+
+
+
+#ALL DATA - BY AGE
+activeDays_age <- merge(activeDays, ids[ , c("id", "InitialAge")], by = "id")
+for (i in seq_along(allAges)) {
+  admissions <- sum(activeDays_age$InitialAge == allAges[i] & 
+                      activeDays_age$onset > -Inf)
+  releases <- sum(activeDays_age$InitialAge == allAges[i] & 
+                      activeDays_age$terminus < Inf)
+  avg_pop <- mean(colSums(cDegDists_age[cDegDists_age$age == 
+                                           allAges[i],-c(1,2)], na.rm = TRUE))
+  turnover_rates[turnover_rates$Type == 
+                   paste("Age", allAges[i], sep=" "), ]$Admissions <- admissions
+  turnover_rates[turnover_rates$Type == 
+                   paste("Age", allAges[i], sep=" "), ]$Releases <- releases
+  turnover_rates[turnover_rates$Type == 
+                   paste("Age", allAges[i], sep=" "), ]$AveragePop <- avg_pop
+}
+remove(admissions, releases, avg_pop)
+
+
+#DAILY SUBSET - BY AGE
+activeDays_age_s <- merge(activeDays_s, ids[ , c("id", "InitialAge")], 
+                          by = "id")
+for (i in seq_along(allAges)) {
+  admissions <- sum(activeDays_age_s$InitialAge == allAges[i] & 
+                      activeDays_age_s$onset > -Inf)
+  releases <- sum(activeDays_age_s$InitialAge == allAges[i] & 
+                      activeDays_age_s$terminus < Inf)
+  avg_pop <- mean(colSums(cDegDists_age[cDegDists_age$age == 
+                                           allAges[i],14:24], na.rm = TRUE))
+  turnover_rates[turnover_rates$Type == 
+                   paste("Age", allAges[i], sep=" "), ]$Admissions_s <- 
+    admissions
+  turnover_rates[turnover_rates$Type == 
+                   paste("Age", allAges[i], sep=" "), ]$Releases_s <- releases
+  turnover_rates[turnover_rates$Type 
+                 == paste("Age", allAges[i], sep=" "), ]$AveragePop_s <- avg_pop
+}
+remove(admissions, releases, avg_pop, activeDays_age, activeDays_age_s)
+
+
+
+#ALL DATA - BY FLOOR
+#Calculate admissions by floor
+admissions_f <- activeDays[activeDays$onset > -Inf, c("id", "onset") ]
+admissions_f <- merge(admissions_f, dates[, c("Date", "DayNum")], 
+                    by.x = "onset", by.y = "DayNum")[, c("id", "Date")]
+admissions_f <- merge(admissions_f, cDailyLoc, by = c("id", "Date"))
+admissions_f$loc <- substr(admissions_f$loc, 0, 1)
+admissions_f <- admissions_f %>% group_by(loc) %>% summarise(admissions = n())
+turnover_rates[grepl("Floor", turnover_rates$Type), ]$Admissions <- 
+  admissions_f$admissions
+remove(admissions_f)
+
+#Calculate releases by floor
+releases_f <- activeDays[activeDays$terminus < Inf, c("id", "terminus") ]
+releases_f$lastDay <- releases_f$terminus - 1 
+releases_f <- merge(releases_f, dates[, c("Date", "DayNum")], 
+                    by.x = "lastDay", by.y = "DayNum")[, c("id", "Date")]
+releases_f <- merge(releases_f, cDailyLoc, by = c("id", "Date"))
+releases_f$loc <- substr(releases_f$loc, 0, 1)
+releases_f <- releases_f %>% group_by(loc) %>% summarise(releases = n())
+turnover_rates[grepl("Floor", turnover_rates$Type), ]$Releases <- 
+  releases_f$releases
+remove(releases_f)
+
+#Calculate average population size by floor
+for (i in seq_along(allFloors)){
+  avg_pop <- mean(colSums(cDegDists_floor[cDegDists_floor$floor == allFloors[i], 
+                                          -c(1,2)], na.rm = TRUE))
+  turnover_rates[turnover_rates$Type == 
+                   paste("Floor", allFloors[i], sep=" "), ]$AveragePop <- avg_pop
+}
+remove(avg_pop)
+
+
+#DAILY SUBSET - BY FLOOR
+#Calculate admissions by floor
+adm_s_f <- activeDays_s[activeDays_s$onset > -Inf, c("id", "onset") ]
+adm_s_f <- merge(adm_s_f, dates[, c("Date", "DayNum")], 
+                    by.x = "onset", by.y = "DayNum")[, c("id", "Date")]
+adm_s_f <- merge(adm_s_f, cDailyLoc, by = c("id", "Date"))
+adm_s_f$loc <- substr(adm_s_f$loc, 0, 1)
+adm_s_f <- adm_s_f %>% group_by(loc) %>% summarise(admissions = n())
+turnover_rates[grepl("Floor", turnover_rates$Type), ]$Admissions_s <- 
+  adm_s_f$admissions
+remove(adm_s_f)
+
+#Calculate releases by floor
+rls_s_f <- activeDays_s[activeDays_s$terminus < Inf, c("id", "terminus") ]
+rls_s_f$lastDay <- rls_s_f$terminus - 1 
+rls_s_f <- merge(rls_s_f, dates[, c("Date", "DayNum")], 
+                    by.x = "lastDay", by.y = "DayNum")[, c("id", "Date")]
+rls_s_f <- merge(rls_s_f, cDailyLoc, by = c("id", "Date"))
+rls_s_f$loc <- substr(rls_s_f$loc, 0, 1)
+rls_s_f <- rls_s_f %>% group_by(loc) %>% summarise(releases = n())
+turnover_rates[grepl("Floor", turnover_rates$Type), ]$Releases_s <- 
+  rls_s_f$releases
+remove(rls_s_f)
+
+#Calculate average population size by floor
+for (i in seq_along(allFloors)){
+  avg_pop <- mean(colSums(cDegDists_floor[cDegDists_floor$floor == allFloors[i], 
+                                          14:24], na.rm = TRUE))
+  turnover_rates[turnover_rates$Type == 
+                   paste("Floor", allFloors[i], sep=" "), ]$AveragePop_s <- 
+    avg_pop
+}
+remove(avg_pop)
+
+
+
+#Calculate turnover rates and print
+turnover_rates$Turnover <- ((turnover_rates$Admissions + 
+                               turnover_rates$Releases) / 
+                              turnover_rates$AveragePop) / max(dates$DayNum) 
+turnover_rates$Turnover_s <- ((turnover_rates$Admissions_s + 
+                               turnover_rates$Releases_s) / 
+                              turnover_rates$AveragePop_s) / 11 
+print(turnover_rates[ ,c("Type", "Turnover", "Turnover_s")])
+```
+
+## Step 8: Create animations of cell-level edges within a single block
+
+In the animations below, blue nodes represent Black residents, green nodes represent white residents, and red nodes represent residents of another race. Larger nodes represent older residents. An edge between two nodes represents two residents being housed in the same cell. A given resident is represented in the animation at time points when they are known (or assumed) to have been in the specified block. 
+
+Again, we take the general approach of assuming that if something is the same in two consecutive rosters, then it was also the same in the time between the two rosters. If an edge is present in one roster and not in the next, then it is assumed to have dissolved immediately after the date of the first roster; similarly, if a resident is in the specified block in one roster but not in the next, then they are assumed to have left immediately after the date of the first roster. For example, if Person A is in Block 1 in Roster 1 (Day 1) and Roster 2 (Day 36) but not in Roster 3 (Day 43), then Person A will be represented in an animation of Block 1 from Day 1 through Day 37 and will not be represented from Day 37 on. 
+
+```{r, message = FALSE}
+library(ndtv)
+library(htmlwidgets)
+
+animateCellNetwork <- function(floor, tower, block, dailySubset = FALSE)
+  {
+  #Separate out data for the requested block and create ids
+  blockData <- m_stdLoc[m_stdLoc$Floor == floor & m_stdLoc$Tower == tower &
+                        m_stdLoc$Block == block, ]
+  blockData <- blockData %>% group_by(SoNum) %>% mutate(id = cur_group_id()) %>%
+    ungroup()
+
+  #Create pairs of residents who were ever in the same cell on the same day
+  pairs <- merge(blockData, blockData, by = c("Date", "Floor", "Tower", "Block",
+                                             "Cell"))
+  pairs <- pairs[, c("Date", "Cell", "id.x", "id.y")]
+  pairs <- subset(pairs, (id.x < id.y))
+  pairs <- merge(pairs, dates, by = "Date")
+
+  #Create a counter that increments for every new contact
+  pairs <- pairs[with(pairs, order(id.x, id.y, DayIndex)), ]
+  ind <- which(pairs$id.x==lag(pairs$id.x) & pairs$id.y==lag(pairs$id.y) &
+                 pairs$DayIndex==(lag(pairs$DayIndex) + 1))
+  pairs$newContact <- "True"
+  pairs[ind, ]$newContact <- "False"
+  pairs$contactCounter <- cumsum(pairs$newContact == "True")
+  pairs$newContact <- NULL
+  remove(ind)
+
+  #List out each contact w/head, tail, start, end, and censoring flags
+  edges <- pairs %>% group_by(contactCounter) %>%
+    summarise(head = first(id.x), tail = first(id.y),
+              onset = min(DayNum), terminus = (max(DayNum)+1))
+  edges$contactCounter <- NULL
+
+  #Create a data frame of people in the block with their attributes
+  people <- blockData %>% group_by(id) %>%
+    summarise(Gender = first(Gender), DOB = last(DOB), Race = last(Race),
+              FirstDate = first(Date))
+  people$Age <- as.integer((people$FirstDate - people$DOB)/365.25)
+  people$FirstDate <- NULL
+  people$DOB <- NULL
+  people$NodeColor <- ifelse(people$Race == "Black", "blue",
+                                ifelse(people$Race == "White", "green", "red"))
+  people$AgeSize <- people$Age / 25
+
+  #Create a dynamic network
+  nw <- network(edges[edges$onset == 1, c("head", "tail")], directed = FALSE,
+                vertices = people)
+  edges <- transform(edges, onset = as.numeric(onset))
+  dynNW <- networkDynamic(nw, edge.spells = edges[ , c("onset", "terminus",
+                                                          "tail", "head")])
+
+  #Activate nodes for days they are present in the requested block
+  active <- blockData[ , c("id", "Date")]
+  active <- merge(active, dates, by = "Date")
+  active <- active[with(active, order(id, DayIndex)), ]
+  ind <- which(active$id==lag(active$id) &
+                 active$DayIndex == (lag(active$DayIndex) + 1))
+  active$newStay <- "True"
+  active[ind, ]$newStay <- "False"
+  active$stayCounter <- cumsum(active$newStay == "True")
+  active$newStay <- NULL
+  remove(ind)
+  active <- active %>% group_by(stayCounter) %>%
+    summarise(id = first(id), firstDay = min(DayNum), lastDay = max(DayNum))
+  active$stayCounter <- NULL
+  active$firstDay[active$firstDay == min(active$firstDay) ] <- -Inf
+  active$lastDay[active$lastDay == max(active$lastDay) ] <- Inf
+  dynNW <- activate.vertices(x = dynNW, onset = active$firstDay,
+                              terminus = (active$lastDay + 1),
+                              v = active$id)
+
+  #Create animation
+  if (dailySubset == FALSE){
+    slice.par <- list(start = 1, end = 101, interval = 1,
+                      aggregate.dur = 1, rule = "any")
+  } else {
+    slice.par <- list(start = 77, end = 87, interval = 1,
+                      aggregate.dur = 1, rule = "any")
+  }
+  render.par <- list(tween.frames = 10, show.time = FALSE)
+  plot.par <- list(mar = c(0, 0, 0, 0))
+  compute.animation(dynNW, slice.par = slice.par, verbose = TRUE,
+                    animation.mode='MDSJ')
+
+  render.d3movie(
+    dynNW,
+    render.par = render.par,
+    plot.par = plot.par,
+    vertex.cex = 'AgeSize',
+    vertex.col = 'NodeColor',
+    edge.col = "darkgrey",
+    vertex.border = "lightgrey",
+    displaylabels = TRUE,
+    output.mode = "htmlWidget")
+}
+
+animateCellNetwork(floor = 2, tower = 'S', block = 1, dailySubset = TRUE)
+animateCellNetwork(floor = 7, tower = 'S', block = 5, dailySubset = TRUE)
+
+```
+
+Tuesday: 
+- Cell-level turnover rates 
+- If extra time: extend all of the above to the block-level network! 

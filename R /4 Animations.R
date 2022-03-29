@@ -1,0 +1,97 @@
+library(ndtv)
+library(dplyr)
+
+animateCellNetwork <- function(floor, tower, block, dailySubset = FALSE)
+  {
+  #Separate out data for the requested block and create ids
+  blockData <- m_stdLoc[m_stdLoc$Floor == floor & m_stdLoc$Tower == tower &
+                        m_stdLoc$Block == block, ]
+  blockData <- blockData %>% group_by(SoNum) %>% mutate(id = cur_group_id()) %>%
+    ungroup()
+
+  #Create pairs of residents who were ever in the same cell on the same day
+  pairs <- merge(blockData, blockData, by = c("Date", "Floor", "Tower", "Block",
+                                             "Cell"))
+  pairs <- pairs[, c("Date", "Cell", "id.x", "id.y")]
+  pairs <- subset(pairs, (id.x < id.y))
+  pairs <- merge(pairs, dates, by = "Date")
+
+  #Create a counter that increments for every new contact
+  pairs <- pairs[with(pairs, order(id.x, id.y, DayIndex)), ]
+  ind <- which(pairs$id.x==lag(pairs$id.x) & pairs$id.y==lag(pairs$id.y) &
+                 pairs$DayIndex==(lag(pairs$DayIndex) + 1))
+  pairs$newContact <- "True"
+  pairs[ind, ]$newContact <- "False"
+  pairs$contactCounter <- cumsum(pairs$newContact == "True")
+  pairs$newContact <- NULL
+  remove(ind)
+
+  #List out each contact w/head, tail, start, end, and censoring flags
+  edges <- pairs %>% group_by(contactCounter) %>%
+    summarise(head = first(id.x), tail = first(id.y),
+              onset = min(DayNum), terminus = (max(DayNum)+1))
+  edges$contactCounter <- NULL
+
+  #Create a data frame of people in the block with their attributes
+  people <- blockData %>% group_by(id) %>%
+    summarise(Gender = first(Gender), DOB = last(DOB), Race = last(Race),
+              FirstDate = first(Date))
+  people$Age <- as.integer((people$FirstDate - people$DOB)/365.25)
+  people$FirstDate <- NULL
+  people$DOB <- NULL
+  people$NodeColor <- ifelse(people$Race == "Black", "blue",
+                                ifelse(people$Race == "White", "green", "red"))
+  people$AgeSize <- people$Age / 25
+
+  #Create a dynamic network
+  nw <- network(edges[edges$onset == 1, c("head", "tail")], directed = FALSE,
+                vertices = people)
+  edges <- transform(edges, onset = as.numeric(onset))
+  dynNW <- networkDynamic(nw, edge.spells = edges[ , c("onset", "terminus",
+                                                          "tail", "head")])
+
+  #Activate nodes for days they are present in the requested block
+  active <- blockData[ , c("id", "Date")]
+  active <- merge(active, dates, by = "Date")
+  active <- active[with(active, order(id, DayIndex)), ]
+  ind <- which(active$id==lag(active$id) &
+                 active$DayIndex == (lag(active$DayIndex) + 1))
+  active$newStay <- "True"
+  active[ind, ]$newStay <- "False"
+  active$stayCounter <- cumsum(active$newStay == "True")
+  active$newStay <- NULL
+  remove(ind)
+  active <- active %>% group_by(stayCounter) %>%
+    summarise(id = first(id), firstDay = min(DayNum), lastDay = max(DayNum))
+  active$stayCounter <- NULL
+  active$firstDay[active$firstDay == min(active$firstDay) ] <- -Inf
+  active$lastDay[active$lastDay == max(active$lastDay) ] <- Inf
+  dynNW <- activate.vertices(x = dynNW, onset = active$firstDay,
+                              terminus = (active$lastDay + 1),
+                              v = active$id)
+
+  #Create animation
+  if (dailySubset == FALSE){
+    slice.par <- list(start = 1, end = 101, interval = 1,
+                      aggregate.dur = 1, rule = "any")
+  } else {
+    slice.par <- list(start = 77, end = 87, interval = 1,
+                      aggregate.dur = 1, rule = "any")
+  }
+  render.par <- list(tween.frames = 10, show.time = FALSE)
+  plot.par <- list(mar = c(0, 0, 0, 0))
+  compute.animation(dynNW, slice.par = slice.par, verbose = TRUE,
+                    animation.mode='MDSJ')
+
+  render.d3movie(
+    dynNW,
+    render.par = render.par,
+    plot.par = plot.par,
+    vertex.cex = 'AgeSize',
+    vertex.col = 'NodeColor',
+    edge.col = "darkgrey",
+    vertex.border = "lightgrey",
+    displaylabels = TRUE,
+    filename = paste0(getwd(), "/", as.character(floor), tower,
+                      as.character(block), ".html"))
+}
