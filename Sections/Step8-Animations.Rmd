@@ -1,5 +1,13 @@
+---
+title: "Step8-Animations"
+author: "Karina Wallrafen-Sam"
+date: "4/1/2022"
+output: html_document
+---
+
+```{r}
 library(ndtv)
-library(dplyr)
+library(htmlwidgets)
 
 animateCellNetwork <- function(floor, tower, block, dailySubset = FALSE)
   {
@@ -47,7 +55,8 @@ animateCellNetwork <- function(floor, tower, block, dailySubset = FALSE)
   nw <- network(edges[edges$onset == 1, c("head", "tail")], directed = FALSE,
                 vertices = people)
   edges <- transform(edges, onset = as.numeric(onset))
-  dynNW <- networkDynamic(nw, edge.spells = edges[ , c("onset", "terminus",
+  dynNW <- networkDynamic(nw, verbose = FALSE, 
+                          edge.spells = edges[ , c("onset", "terminus",
                                                           "tail", "head")])
 
   #Activate nodes for days they are present in the requested block
@@ -80,7 +89,7 @@ animateCellNetwork <- function(floor, tower, block, dailySubset = FALSE)
   }
   render.par <- list(tween.frames = 10, show.time = FALSE)
   plot.par <- list(mar = c(0, 0, 0, 0))
-  compute.animation(dynNW, slice.par = slice.par, verbose = TRUE,
+  compute.animation(dynNW, slice.par = slice.par, verbose = FALSE,
                     animation.mode='MDSJ')
 
   render.d3movie(
@@ -92,6 +101,10 @@ animateCellNetwork <- function(floor, tower, block, dailySubset = FALSE)
     edge.col = "darkgrey",
     vertex.border = "lightgrey",
     displaylabels = TRUE,
-    filename = paste0(getwd(), "/", as.character(floor), tower,
-                      as.character(block), ".html"))
+    verbose = FALSE,
+    output.mode = "htmlWidget")
 }
+
+animateCellNetwork(floor = 2, tower = 'S', block = 1, dailySubset = TRUE)
+animateCellNetwork(floor = 7, tower = 'S', block = 5, dailySubset = TRUE)
+```
