@@ -1,0 +1,40 @@
+---
+title: "Step6-CellTurnover"
+author: "Karina Wallrafen-Sam"
+date: "4/1/2022"
+output: html_document
+---
+
+```{r}
+cellTurnover <- merge(cDailyLoc, dates, by = "Date")
+cellTurnover <- cellTurnover[with(cellTurnover, order(id, DayIndex)), ]
+ind <- which(cellTurnover$id==lag(cellTurnover$id) &
+               cellTurnover$DayIndex == (lag(cellTurnover$DayIndex) + 1))
+cellTurnover$newStay <- "True"
+cellTurnover[ind, ]$newStay <- "False"
+cellTurnover$stayCounter <- cumsum(cellTurnover$newStay == "True")
+cellTurnover$newStay <- NULL
+ind2 <- which(cellTurnover$stayCounter==lag(cellTurnover$stayCounter) &
+               cellTurnover$loc == lag(cellTurnover$loc))
+cellTurnover$newLoc <- "True"
+cellTurnover[ind2, ]$newLoc <- "False"
+cellTurnover$locCounter <- cumsum(cellTurnover$newLoc == "True")
+cellTurnover$newLoc <- NULL
+remove(ind, ind2)
+cellTurnover <- cellTurnover %>% group_by(stayCounter) %>%
+  summarise(id = first(id), firstDay = min(DayNum), lastDay = max(DayNum), 
+            numLocs = n_distinct(locCounter))
+cellTurnover$stayCounter <- NULL
+cellTurnover$duration <- cellTurnover$lastDay - cellTurnover$firstDay + 1
+cellTurnover$timePerLoc <- cellTurnover$duration/cellTurnover$numLocs 
+cellTurnover$startCensored <- "N"
+cellTurnover$startCensored[cellTurnover$firstDay == 
+                             min(cellTurnover$firstDay) ] <- "Y"
+cellTurnover$endCensored <- "N"
+cellTurnover$endCensored[cellTurnover$lastDay == 
+                           max(cellTurnover$lastDay) ] <- "Y"
+
+cellTurnSum <- cellTurnover %>% group_by(startCensored, endCensored) %>% 
+  summarise (meanTimePerLoc = mean(timePerLoc), meanSpellDur = mean(duration), 
+             meanNumLocs = mean(numLocs), numSpells = n())
+```

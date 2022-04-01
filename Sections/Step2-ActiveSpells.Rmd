@@ -1,0 +1,46 @@
+---
+title: "Step2-ActiveSpells"
+author: "Karina Wallrafen-Sam"
+date: "4/1/2022"
+output: html_document
+---
+
+```{r}
+#Create a df that lists out known spells in each location for each id
+#People in the same cell in consecutive rosters are assumed to have stayed in
+#the same cell between those two rosters
+cLocs <- merge(cDailyLoc, dates, by = "Date")
+cLocs <- cLocs[with(cLocs, order(id, DayIndex)), ]
+ind <- which(cLocs$id==lag(cLocs$id) & cLocs$loc==lag(cLocs$loc) &
+               cLocs$DayIndex==(lag(cLocs$DayIndex) + 1))
+cLocs$newLoc <- "True"
+cLocs[ind, ]$newLoc <- "False"
+cLocs$locCounter <- cumsum(cLocs$newLoc == "True")
+cLocs$newLoc <- NULL
+remove(ind)
+cLocs <- cLocs %>% group_by(locCounter) %>%
+  summarise(id = first(id), loc = first(loc), onset = min(DayNum),
+            terminus = max(DayNum) + 1)
+cLocs$locCounter <- NULL
+cLocs$onset[cLocs$onset == min(cLocs$onset) ] <- -Inf
+cLocs$terminus[cLocs$terminus == max(cLocs$terminus) ] <- Inf
+cLocs <- transform(cLocs, id = as.numeric(id))
+
+#Create a df of spells of presence in jail for each id
+#People who appear in consecutive rosters are assumed to have been in the jail
+#between those two rosters (even if their cell changed)
+activeDays <- merge(cDailyLoc, dates, by = "Date")
+activeDays <- activeDays[with(activeDays, order(id, DayIndex)), ]
+ind <- which(activeDays$id==lag(activeDays$id) &
+            activeDays$DayIndex == (lag(activeDays$DayIndex) + 1))
+activeDays$newStay <- "True"
+activeDays[ind, ]$newStay <- "False"
+activeDays$stayCounter <- cumsum(activeDays$newStay == "True")
+activeDays$newStay <- NULL
+remove(ind)
+activeDays <- activeDays %>% group_by(stayCounter) %>%
+  summarise(id = first(id), onset = min(DayNum), terminus = max(DayNum) + 1)
+activeDays$stayCounter <- NULL
+activeDays$onset[activeDays$onset == min(activeDays$onset) ] <- -Inf
+activeDays$terminus[activeDays$terminus == max(activeDays$terminus) ] <- Inf
+```

@@ -1,0 +1,73 @@
+---
+title: "Step4-DegreeDist"
+author: "Karina Wallrafen-Sam"
+date: "4/1/2022"
+output: html_document
+---
+
+```{r}
+library("DescTools")
+library("ggplot2")
+
+#Overall degree distribution at each time point
+for (i in seq_len(nrow(dates))){
+  currentNW <- as.network(network.extract(cDynNW, at = dates$DayNum[i]))
+  dist <- degreedist(currentNW, print = FALSE)
+  dist <- data.frame(deg = as.integer(substr(names(dist), 7, 8)),
+                     num = as.integer(dist))
+  names(dist)[names(dist) == "num"] <- toString(dates$Date[i])
+  if (i == 1) {
+    cDegDists <- dist
+  } else {
+    cDegDists <- merge(cDegDists, dist, by = "deg", all = TRUE)
+  }
+}
+remove(dist, i, currentNW)
+
+#Histograms:
+par(mfrow = c(3,2))
+days <- c(1, 2, 5, 11, 17, 25) #Day indices, not day numbers
+for (i in seq_along(days)) {
+  barplot(cDegDists[, (days[i] + 1)], names.arg = cDegDists$deg, 
+          xlab = "Degree", ylab = "Frequency", 
+          main = paste("Degree Distribution on", dates$Date[days[i]], sep=" "))
+}
+
+#Mean degree (& standard dev of degree) at each time point
+cDegDists[is.na(cDegDists)] <- 0 
+cMeanDeg <- lapply(cDegDists[ , -1], function(x) 
+  weighted.mean(x = cDegDists$deg, w = x))
+cMeanDeg <- do.call(rbind, cMeanDeg)
+cMeanDeg <- data.frame(dates$Date, cMeanDeg)
+cMeanDeg$sd <- as.numeric(lapply(cDegDists[ , -1], function(x) 
+  SD(x = cDegDists$deg, weights = x)))
+cMeanDeg$max <- as.numeric(lapply(cDegDists[ , -1], function(x) 
+  max(cDegDists[x != 0, ]$deg)))
+cMeanDeg$min <- as.numeric(lapply(cDegDists[ , -1], function(x) 
+  min(cDegDists[x != 0, ]$deg)))
+
+#Create box plot of mean degree
+par(mfrow = c(1,1))
+ggplot(cMeanDeg,aes(x=dates.Date)) + 
+  geom_boxplot(aes(lower=(cMeanDeg-sd), upper=(cMeanDeg+sd), middle=cMeanDeg, 
+                   ymin=min, ymax=max, group = dates.Date), 
+               stat="identity") + 
+  ggtitle("Mean degree (with SD) over time") +
+  xlab("Date") + ylab("Degree")
+
+#Create scatterplot of mean degree
+par(mfrow = c(1,1))
+plot(x = cMeanDeg$dates.Date, y = cMeanDeg$cMeanDeg, 
+     xlab = "Date", ylab = "Mean Degree",
+     main = "Mean degree over time")
+
+#Mean degree averaged across all days of data
+cOverallMeanDeg <- mean(cMeanDeg$cMeanDeg)
+print(paste0("The mean degree averaged across all days of data is ", 
+             round(cOverallMeanDeg, digits = 4), " edges per node."))
+
+#Mean degree averaged across the daily subset of data
+cSubsetMeanDeg <- mean(cMeanDeg$cMeanDeg[12:22])
+print(paste0("The mean degree averaged across the days from 01/11 to 01/21 is ", 
+             round(cSubsetMeanDeg, digits = 4), " edges per node."))
+```
