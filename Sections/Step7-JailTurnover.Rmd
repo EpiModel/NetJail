@@ -6,61 +6,24 @@ output: html_document
 ---
 
 ```{r}
-allFloors <- unique(cDegDists_floor[["floor"]])           
-allRaces <- unique(cDegDists_race[["race"]])
-allAges <- unique(cDegDists_age[["age"]])
-rows <- c("Overall", paste("Floor", allFloors, sep=" "), allRaces, 
-          paste("Age", allAges, sep=" "))
-
-turnover_rates <- data.frame(Type = rows, Admissions=NA, Releases=NA, 
-                             AveragePop = NA, TurnoverIn = NA, TurnoverOut = NA, 
-                             Admissions_s = NA, Releases_s = NA, 
-                             AveragePop_s = NA, TurnoverIn_s = NA, 
-                             TurnoverOut_s = NA)
+turnover_rates <- data.frame(Category = rows, Admissions=NA, Releases=NA, 
+                             AveragePop = NA, TurnoverIn = NA, TurnoverOut = NA)
 remove(rows)
 
-#ALL DATA - OVERALL
+#OVERALL
 #Calculate # of new admissions (including repeat admissions)
 admissions <- sum(activeDays$onset > -Inf)
-turnover_rates[turnover_rates$Type == "Overall", ]$Admissions <- admissions
+turnover_rates[turnover_rates$Category == "Overall", ]$Admissions <- admissions
 
 #Calculate # of releases
 releases <- sum(activeDays$terminus < Inf)
-turnover_rates[turnover_rates$Type == "Overall", ]$Releases <- releases
+turnover_rates[turnover_rates$Category == "Overall", ]$Releases <- releases
 
-#Calculate average daily population
-sizes <- c()
-for (i in seq_len(nrow(dates))) {
-  currentSize <- network.size.active(cDynNW, at = dates$DayNum[i])
-  sizes <- c(sizes, currentSize) 
-}
-avg_pop <- mean(sizes)
-turnover_rates[turnover_rates$Type == "Overall", ]$AveragePop <- avg_pop
-remove(admissions, releases, avg_pop, sizes, currentSize, i)
+#Find average daily population
+turnover_rates[turnover_rates$Category == "Overall", ]$AveragePop <- avg_pop
+remove(admissions, releases)
 
-#DAILY SUBSET - OVERALL
-#Calculate # of new admissions (including repeat admissions)
-activeDays_s <- activeDays[activeDays$onset <= 87 & activeDays$terminus > 77, ]
-activeDays_s$onset[activeDays_s$onset <= 77 ] <- -Inf
-activeDays_s$terminus[activeDays_s$terminus > 87 ] <- Inf
-admissions_s <- sum(activeDays_s$onset > -Inf)
-turnover_rates[turnover_rates$Type == "Overall", ]$Admissions_s <- admissions_s
-
-#Calculate # of releases
-releases_s <- sum(activeDays_s$terminus < Inf)
-turnover_rates[turnover_rates$Type == "Overall", ]$Releases_s <- releases_s
-
-#Calculate average daily population
-sizes_s <- c()
-for (i in 12:22) {
-  currentSize <- network.size.active(cDynNW, at = dates$DayNum[i])
-  sizes_s <- c(sizes_s, currentSize) 
-}
-avg_pop_s <- mean(sizes_s)
-turnover_rates[turnover_rates$Type == "Overall", ]$AveragePop_s <- avg_pop_s
-remove(i, admissions_s, releases_s, avg_pop_s, sizes_s, currentSize)
-
-#ALL DATA - BY RACE
+#BY RACE
 activeDays_race <- merge(activeDays, ids[ , c("id", "Race")], by = "id")
 activeDays_race[activeDays_race$Race != "White" & 
                   activeDays_race$Race != "Black", ]$Race <- "Other"
@@ -71,31 +34,14 @@ for (i in seq_along(allRaces)) {
                       activeDays_race$terminus < Inf)
   avg_pop <- mean(colSums(cDegDists_race[cDegDists_race$race == 
                                            allRaces[i],-c(1,2)], na.rm = TRUE))
-  turnover_rates[turnover_rates$Type == allRaces[i], ]$Admissions <- admissions
-  turnover_rates[turnover_rates$Type == allRaces[i], ]$Releases <- releases
-  turnover_rates[turnover_rates$Type == allRaces[i], ]$AveragePop <- avg_pop
+  turnover_rates[turnover_rates$Category == allRaces[i], ]$Admissions <- 
+    admissions
+  turnover_rates[turnover_rates$Category == allRaces[i], ]$Releases <- releases
+  turnover_rates[turnover_rates$Category == allRaces[i], ]$AveragePop <- avg_pop
 }
 remove(admissions, releases, avg_pop)
 
-#DAILY SUBSET - BY RACE
-activeDays_race_s <- merge(activeDays_s, ids[ , c("id", "Race")], by = "id")
-activeDays_race_s[activeDays_race_s$Race != "White" & 
-                  activeDays_race_s$Race != "Black", ]$Race <- "Other"
-for (i in seq_along(allRaces)) {
-  admissions <- sum(activeDays_race_s$Race == allRaces[i] & 
-                      activeDays_race_s$onset > -Inf)
-  releases <- sum(activeDays_race_s$Race == allRaces[i] & 
-                      activeDays_race_s$terminus < Inf)
-  avg_pop <- mean(colSums(cDegDists_race[cDegDists_race$race == 
-                                           allRaces[i],14:24], na.rm = TRUE))
-  turnover_rates[turnover_rates$Type == allRaces[i], ]$Admissions_s <- 
-    admissions
-  turnover_rates[turnover_rates$Type == allRaces[i], ]$Releases_s <- releases
-  turnover_rates[turnover_rates$Type == allRaces[i], ]$AveragePop_s <- avg_pop
-}
-remove(admissions, releases, avg_pop, activeDays_race, activeDays_race_s)
-
-#ALL DATA - BY AGE
+#BY AGE
 activeDays_age <- merge(activeDays, ids[ , c("id", "InitialAge")], by = "id")
 activeDays_age$InitialAge <- cut(activeDays_age$InitialAge, 
                                  breaks=c(0, 20, 30, 40, 50, 60, 100), 
@@ -109,41 +55,16 @@ activeDays_age$InitialAge <- cut(activeDays_age$InitialAge,
                       activeDays_age$terminus < Inf)
   avg_pop <- mean(colSums(cDegDists_age[cDegDists_age$age == 
                                            allAges[i],-c(1,2)], na.rm = TRUE))
-  turnover_rates[turnover_rates$Type == 
+  turnover_rates[turnover_rates$Category == 
                    paste("Age", allAges[i], sep=" "), ]$Admissions <- admissions
-  turnover_rates[turnover_rates$Type == 
+  turnover_rates[turnover_rates$Category == 
                    paste("Age", allAges[i], sep=" "), ]$Releases <- releases
-  turnover_rates[turnover_rates$Type == 
+  turnover_rates[turnover_rates$Category == 
                    paste("Age", allAges[i], sep=" "), ]$AveragePop <- avg_pop
 }
 remove(admissions, releases, avg_pop)
 
-#DAILY SUBSET - BY AGE
-activeDays_age_s <- merge(activeDays_s, ids[ , c("id", "InitialAge")], 
-                          by = "id")
-activeDays_age_s$InitialAge <- cut(activeDays_age_s$InitialAge, 
-                                 breaks=c(0, 20, 30, 40, 50, 60, 100), 
-                                 right = FALSE, 
-                                 labels = c("Under 20", "20 - 29", "30 - 39", 
-                                            "40 - 49", "50 - 59", "60+"))
-for (i in seq_along(allAges)) {
-  admissions <- sum(activeDays_age_s$InitialAge == allAges[i] & 
-                      activeDays_age_s$onset > -Inf)
-  releases <- sum(activeDays_age_s$InitialAge == allAges[i] & 
-                      activeDays_age_s$terminus < Inf)
-  avg_pop <- mean(colSums(cDegDists_age[cDegDists_age$age == 
-                                           allAges[i],14:24], na.rm = TRUE))
-  turnover_rates[turnover_rates$Type == 
-                   paste("Age", allAges[i], sep=" "), ]$Admissions_s <- 
-    admissions
-  turnover_rates[turnover_rates$Type == 
-                   paste("Age", allAges[i], sep=" "), ]$Releases_s <- releases
-  turnover_rates[turnover_rates$Type 
-                 == paste("Age", allAges[i], sep=" "), ]$AveragePop_s <- avg_pop
-}
-remove(admissions, releases, avg_pop, activeDays_age, activeDays_age_s)
-
-#ALL DATA - BY FLOOR
+#BY FLOOR
 #Calculate admissions by floor
 admissions_f <- activeDays[activeDays$onset > -Inf, c("id", "onset") ]
 admissions_f <- merge(admissions_f, dates[, c("Date", "DayNum")], 
@@ -151,7 +72,7 @@ admissions_f <- merge(admissions_f, dates[, c("Date", "DayNum")],
 admissions_f <- merge(admissions_f, cDailyLoc, by = c("id", "Date"))
 admissions_f$loc <- substr(admissions_f$loc, 0, 1)
 admissions_f <- admissions_f %>% group_by(loc) %>% summarise(admissions = n())
-turnover_rates[grepl("Floor", turnover_rates$Type), ]$Admissions <- 
+turnover_rates[grepl("Floor", turnover_rates$Category), ]$Admissions <- 
   admissions_f$admissions
 remove(admissions_f)
 
@@ -163,7 +84,7 @@ releases_f <- merge(releases_f, dates[, c("Date", "DayNum")],
 releases_f <- merge(releases_f, cDailyLoc, by = c("id", "Date"))
 releases_f$loc <- substr(releases_f$loc, 0, 1)
 releases_f <- releases_f %>% group_by(loc) %>% summarise(releases = n())
-turnover_rates[grepl("Floor", turnover_rates$Type), ]$Releases <- 
+turnover_rates[grepl("Floor", turnover_rates$Category), ]$Releases <- 
   releases_f$releases
 remove(releases_f)
 
@@ -171,42 +92,8 @@ remove(releases_f)
 for (i in seq_along(allFloors)){
   avg_pop <- mean(colSums(cDegDists_floor[cDegDists_floor$floor == allFloors[i], 
                                           -c(1,2)], na.rm = TRUE))
-  turnover_rates[turnover_rates$Type == 
-                   paste("Floor", allFloors[i], sep=" "), ]$AveragePop <- avg_pop
-}
-remove(avg_pop)
-
-
-#DAILY SUBSET - BY FLOOR
-#Calculate admissions by floor
-adm_s_f <- activeDays_s[activeDays_s$onset > -Inf, c("id", "onset") ]
-adm_s_f <- merge(adm_s_f, dates[, c("Date", "DayNum")], 
-                    by.x = "onset", by.y = "DayNum")[, c("id", "Date")]
-adm_s_f <- merge(adm_s_f, cDailyLoc, by = c("id", "Date"))
-adm_s_f$loc <- substr(adm_s_f$loc, 0, 1)
-adm_s_f <- adm_s_f %>% group_by(loc) %>% summarise(admissions = n())
-turnover_rates[grepl("Floor", turnover_rates$Type), ]$Admissions_s <- 
-  adm_s_f$admissions
-remove(adm_s_f)
-
-#Calculate releases by floor
-rls_s_f <- activeDays_s[activeDays_s$terminus < Inf, c("id", "terminus") ]
-rls_s_f$lastDay <- rls_s_f$terminus - 1 
-rls_s_f <- merge(rls_s_f, dates[, c("Date", "DayNum")], 
-                    by.x = "lastDay", by.y = "DayNum")[, c("id", "Date")]
-rls_s_f <- merge(rls_s_f, cDailyLoc, by = c("id", "Date"))
-rls_s_f$loc <- substr(rls_s_f$loc, 0, 1)
-rls_s_f <- rls_s_f %>% group_by(loc) %>% summarise(releases = n())
-turnover_rates[grepl("Floor", turnover_rates$Type), ]$Releases_s <- 
-  rls_s_f$releases
-remove(rls_s_f)
-
-#Calculate average population size by floor
-for (i in seq_along(allFloors)){
-  avg_pop <- mean(colSums(cDegDists_floor[cDegDists_floor$floor == allFloors[i], 
-                                          14:24], na.rm = TRUE))
-  turnover_rates[turnover_rates$Type == 
-                   paste("Floor", allFloors[i], sep=" "), ]$AveragePop_s <- 
+  turnover_rates[turnover_rates$Category == 
+                   paste("Floor", allFloors[i], sep=" "), ]$AveragePop <- 
     avg_pop
 }
 remove(avg_pop)
@@ -216,9 +103,91 @@ turnover_rates$TurnoverIn <- (turnover_rates$Admissions /
                                 turnover_rates$AveragePop) / max(dates$DayNum) 
 turnover_rates$TurnoverOut <- (turnover_rates$Releases / 
                                 turnover_rates$AveragePop) / max(dates$DayNum) 
-turnover_rates$TurnoverIn_s <- (turnover_rates$Admissions_s / 
-                              turnover_rates$AveragePop_s) / 11 
-turnover_rates$TurnoverOut_s <- (turnover_rates$Releases_s / 
-                              turnover_rates$AveragePop_s) / 11
-print(turnover_rates[ ,c("Type", "TurnoverOut", "TurnoverOut_s")])
+print(turnover_rates[ ,c("Category", "TurnoverOut")])
+
+
+
+
+
+
+
+#Another approach to estimating avg. duration in network...
+if (EstimateDurations == TRUE) {
+  durations <- merge(cDailyLoc, dates, by = "Date")
+  durations <- durations[with(durations, order(id, DayIndex)), ]
+  ind <- which(durations$id==lag(durations$id) &
+                 durations$DayIndex == (lag(durations$DayIndex) + 1))
+  durations$newStay <- "True"
+  durations[ind, ]$newStay <- "False"
+  durations$stayCounter <- cumsum(durations$newStay == "True")
+  durations$newStay <- NULL
+  ind2 <- which(durations$stayCounter==lag(durations$stayCounter) &
+                  durations$loc == lag(durations$loc))
+  durations$newLoc <- "True"
+  durations[ind2, ]$newLoc <- "False"
+  durations$locCounter <- cumsum(durations$newLoc == "True")
+  durations$newLoc <- NULL
+  remove(ind, ind2)
+  durations <- durations %>% group_by(stayCounter) %>%
+    summarise(id = first(id), firstDay = min(DayNum), lastDay = max(DayNum), 
+              numLocs = n_distinct(locCounter))
+  durations$stayCounter <- NULL
+  durations$duration <- durations$lastDay - durations$firstDay + 1
+  durations$startCensored <- "N"
+  durations$startCensored[durations$firstDay == 
+                            min(durations$firstDay) ] <- "Y"
+  durations$endCensored <- "N"
+  durations$endCensored[durations$lastDay == 
+                          max(durations$lastDay) ] <- "Y"
+  durations <- merge(durations, ids[ , c("id", "Race", "InitialAge")], 
+                     by = "id")
+  durations[durations$Race != "White" & durations$Race != "Black", ]$Race <- 
+    "Other"
+  durations$InitialAge <- cut(durations$InitialAge, 
+                              breaks=c(0, 20, 30, 40, 50, 60, 100), 
+                              right = FALSE, labels = c("Under 20", "20 - 29", 
+                                                        "30 - 39", "40 - 49", 
+                                                        "50 - 59", "60+"))
+  durations <- merge(durations, dates[, c("Date", "DayNum")], 
+                     by.x = "firstDay", by.y = "DayNum")
+  durations <- merge(durations, cDailyLoc, by = c("id", "Date"))
+  durations$InitialFloor <- substr(durations$loc, 0, 1)
+  
+  durations1 <- durations %>% group_by(startCensored, endCensored) %>%
+    summarise(category = "Overall", meanDur = mean(duration), numSpells = n(), 
+              meanNumLocs = mean(numLocs))
+  
+  durations2 <- durations %>% 
+    group_by(startCensored, endCensored, InitialFloor) %>% 
+    summarise(meanDur = mean(duration), numSpells = n(), 
+              meanNumLocs = mean(numLocs))
+  durations2$InitialFloor <- paste("Floor", durations2$InitialFloor)
+  names(durations2)[names(durations2) == "InitialFloor"] <- 'category'
+  
+  durations3 <- durations %>% group_by(startCensored, endCensored, Race) %>% 
+    summarise(meanDur = mean(duration), numSpells = n(), 
+              meanNumLocs = mean(numLocs))
+  durations3$Race <- paste("Race", durations3$Race)
+  names(durations3)[names(durations3) == 'Race'] <- 'category'
+  
+  durations4 <- durations %>% 
+    group_by(startCensored, endCensored, InitialAge) %>% 
+    summarise(meanDur = mean(duration), numSpells = n(), 
+              meanNumLocs = mean(numLocs))
+  durations4$InitialAge <- paste("Age", durations4$InitialAge)
+  names(durations4)[names(durations4) == 'InitialAge'] <- 'category'
+  
+  durationsSummary <- rbind(durations1, durations2, durations3, durations4)
+  durationsSummary <- durationsSummary[with(durationsSummary, order(category)),]
+  durationsSummary <- durationsSummary %>% group_by(category) %>%
+    mutate(percentSpells = round(numSpells / sum(numSpells), 4) * 100) 
+  durationsSummary$meanDur <- round(durationsSummary$meanDur, 2)
+  durationsSummary$meanNumLocs <- round(durationsSummary$meanNumLocs, 2)
+  print.data.frame(durationsSummary[durationsSummary$category == "Overall",
+                                    c("startCensored", "endCensored", "category", 
+                                      "meanDur", "meanNumLocs", 
+                                      "percentSpells")])
+  
+  remove(durations1, durations2, durations3, durations4)
+}
 ```

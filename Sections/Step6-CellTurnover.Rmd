@@ -6,35 +6,129 @@ output: html_document
 ---
 
 ```{r}
-cellTurnover <- merge(cDailyLoc, dates, by = "Date")
-cellTurnover <- cellTurnover[with(cellTurnover, order(id, DayIndex)), ]
-ind <- which(cellTurnover$id==lag(cellTurnover$id) &
-               cellTurnover$DayIndex == (lag(cellTurnover$DayIndex) + 1))
-cellTurnover$newStay <- "True"
-cellTurnover[ind, ]$newStay <- "False"
-cellTurnover$stayCounter <- cumsum(cellTurnover$newStay == "True")
-cellTurnover$newStay <- NULL
-ind2 <- which(cellTurnover$stayCounter==lag(cellTurnover$stayCounter) &
-               cellTurnover$loc == lag(cellTurnover$loc))
-cellTurnover$newLoc <- "True"
-cellTurnover[ind2, ]$newLoc <- "False"
-cellTurnover$locCounter <- cumsum(cellTurnover$newLoc == "True")
-cellTurnover$newLoc <- NULL
-remove(ind, ind2)
-cellTurnover <- cellTurnover %>% group_by(stayCounter) %>%
-  summarise(id = first(id), firstDay = min(DayNum), lastDay = max(DayNum), 
-            numLocs = n_distinct(locCounter))
-cellTurnover$stayCounter <- NULL
-cellTurnover$duration <- cellTurnover$lastDay - cellTurnover$firstDay + 1
-cellTurnover$timePerLoc <- cellTurnover$duration/cellTurnover$numLocs 
-cellTurnover$startCensored <- "N"
-cellTurnover$startCensored[cellTurnover$firstDay == 
-                             min(cellTurnover$firstDay) ] <- "Y"
-cellTurnover$endCensored <- "N"
-cellTurnover$endCensored[cellTurnover$lastDay == 
-                           max(cellTurnover$lastDay) ] <- "Y"
+allFloors <- unique(cDegDists_floor[["floor"]])           
+allRaces <- unique(cDegDists_race[["race"]])
+allAges <- unique(cDegDists_age[["age"]])
+rows <- c("Overall", paste("Floor", allFloors, sep=" "), allRaces, 
+          paste("Age", allAges, sep=" "))
+cell_changes <- data.frame(Category = rows, LocChanges=NA, AveragePop=NA, 
+                           CellChangeRate = NA)
 
-cellTurnSum <- cellTurnover %>% group_by(startCensored, endCensored) %>% 
-  summarise (meanTimePerLoc = mean(timePerLoc), meanSpellDur = mean(duration), 
-             meanNumLocs = mean(numLocs), numSpells = n())
+#OVERALL
+#Count up the total # of times a location spell ended w/o a corresponding active 
+#spell ending. This is the total # of times someone changed cells w/o 
+#entering/leaving the jail
+locChanges <- anti_join(cLocs, activeDays, by = c("id", "terminus"))
+cell_changes[cell_changes$Category == "Overall", ]$LocChanges <- 
+  nrow(locChanges)
+
+#Calculate the average active population size
+sizes <- c()
+for (i in seq_len(nrow(dates))) {
+  currentSize <- network.size.active(cDynNW, at = dates$DayNum[i])
+  sizes <- c(sizes, currentSize) 
+}
+avg_pop <- mean(sizes)
+cell_changes[cell_changes$Category == "Overall", ]$AveragePop <- avg_pop
+remove (currentSize, i)
+
+#BY ATTRIBUTE
+locChanges <- merge(locChanges, ids[ , c("id", "Race", "InitialAge")], 
+                    by = "id")
+locChanges[locChanges$Race != "White" & locChanges$Race != "Black", ]$Race <- 
+  "Other"
+locChanges$InitialAge <- cut(locChanges$InitialAge, 
+                             breaks=c(0, 20, 30, 40, 50, 60, 100), 
+                             right = FALSE, labels = c("Under 20", "20 - 29", 
+                                                       "30 - 39", "40 - 49", 
+                                                       "50 - 59", "60+"))
+locChanges$Floor <- substr(locChanges$loc, 0, 1)
+locChanges_race <- locChanges %>% group_by(Race) %>% summarize(locChanges = n())
+locChanges_age <- locChanges %>% group_by(InitialAge) %>% 
+  summarize(locChanges = n())
+locChanges_floor <- locChanges %>% group_by(Floor) %>% 
+  summarize(locChanges = n())
+for (i in seq_along(allRaces)) {
+  cell_changes[cell_changes$Category == allRaces[i], ]$LocChanges <- 
+    locChanges_race[locChanges_race$Race == allRaces[i], ]$locChanges
+  cell_changes[cell_changes$Category == allRaces[i], ]$AveragePop <- 
+    mean(colSums(cDegDists_race[cDegDists_race$race == 
+                                           allRaces[i],-c(1,2)], na.rm = TRUE))
+}
+for (i in seq_along(allAges)) {
+  cell_changes[cell_changes$Category == 
+                 paste("Age", allAges[i], sep=" "), ]$LocChanges <- 
+    locChanges_age[locChanges_age$InitialAge == allAges[i], ]$locChanges
+  cell_changes[cell_changes$Category == 
+                 paste("Age", allAges[i], sep=" "), ]$AveragePop <- 
+    mean(colSums(cDegDists_age[cDegDists_age$age == 
+                                           allAges[i],-c(1,2)], na.rm = TRUE))
+}
+for (i in seq_along(allFloors)) {
+  cell_changes[cell_changes$Category == 
+                 paste("Floor", allFloors[i], sep=" "), ]$LocChanges <- 
+    locChanges_floor[locChanges_floor$Floor == allFloors[i], ]$locChanges
+  cell_changes[cell_changes$Category == 
+                 paste("Floor", allFloors[i], sep=" "), ]$AveragePop <- 
+    mean(colSums(cDegDists_floor[cDegDists_floor$floor == 
+                                           allFloors[i],-c(1,2)], na.rm = TRUE))
+}
+remove(locChanges_age, locChanges_floor, locChanges_race)
+
+#Calculate turnover rates and print
+cell_changes$CellChangeRate <- (cell_changes$LocChanges / 
+                                cell_changes$AveragePop) / max(dates$DayNum) 
+print(cell_changes[ ,c("Category", "CellChangeRate")])
+
+#Another approach to estimating avg. duration in a particular location...
+if (EstimateLocDurations == TRUE) {
+  locDurations <- cLocs
+  locDurations$startCensored <- "N"
+  locDurations$startCensored[locDurations$onset == -Inf ] <- "Y"
+  locDurations$endCensored <- "N"
+  locDurations$endCensored[locDurations$terminus == Inf ] <- "Y"
+  locDurations$onset[locDurations$onset == -Inf] <- 1
+  locDurations$terminus[locDurations$terminus == Inf] <- max(dates$DayNum) + 1
+  locDurations$duration <- locDurations$terminus - locDurations$onset
+  locDurations <- merge(locDurations, ids[ , c("id", "Race", "InitialAge")], 
+                        by = "id")
+  locDurations[locDurations$Race != "White" & 
+                 locDurations$Race != "Black", ]$Race <- "Other"
+  locDurations$InitialAge <- cut(locDurations$InitialAge, 
+                                 breaks=c(0, 20, 30, 40, 50, 60, 100), 
+                                 right = FALSE, 
+                                 labels = c("Under 20", "20 - 29", "30 - 39", 
+                                            "40 - 49", "50 - 59", "60+"))
+  locDurations$Floor <- substr(locDurations$loc, 0, 1)
+  
+  locDurations1 <- locDurations %>% group_by(startCensored, endCensored) %>% 
+    summarise(category = "Overall", meanDur = mean(duration), numSpells = n())
+  
+  locDurations2 <- locDurations %>% 
+    group_by(startCensored, endCensored, Floor) %>% 
+    summarise(meanDur = mean(duration), numSpells = n())
+  locDurations2$Floor <- paste("Floor", locDurations2$Floor)
+  names(locDurations2)[names(locDurations2) == 'Floor'] <- 'category'
+  
+  locDurations3 <- locDurations %>% 
+    group_by(startCensored, endCensored, Race) %>% 
+    summarise(meanDur = mean(duration), numSpells = n())
+  locDurations3$Race <- paste("Race", locDurations3$Race)
+  names(locDurations3)[names(locDurations3) == 'Race'] <- 'category'
+  
+  locDurations4 <- locDurations %>% 
+    group_by(startCensored, endCensored, InitialAge) %>% 
+    summarise(meanDur = mean(duration), numSpells = n())
+  locDurations4$InitialAge <- paste("Age", locDurations4$InitialAge)
+  names(locDurations4)[names(locDurations4) == 'InitialAge'] <- 'category'
+  
+  locDurations <- rbind(locDurations1, locDurations2, locDurations3, 
+                        locDurations4)
+  locDurations <- locDurations[with(locDurations, order(category)), ]
+  locDurations <- locDurations %>% group_by(category) %>%
+    mutate(percentSpells = numSpells / sum(numSpells)) 
+  print.data.frame(locDurations[locDurations$category == "Overall", ])
+  
+  remove(locDurations1, locDurations2, locDurations3, locDurations4)
+}
 ```

@@ -62,6 +62,9 @@ timeGaps <- timeGaps %>% group_by(Date) %>% mutate(Day = cur_group_id()) %>%
 timeGaps <- which(timeGaps$SoNum==lag(timeGaps$SoNum) &
                     timeGaps$Day != (lag(timeGaps$Day) + 1))
 
+#Subset only to the time frame of interest
+all_data <- all_data[all_data$Date >= firstDay & all_data$Date <= lastDay, ]
+
 #For now: Separate out women and men with special locations
 data_m <- subset(all_data, Gender == "M")
 data_f <- subset(all_data, Gender == "F")

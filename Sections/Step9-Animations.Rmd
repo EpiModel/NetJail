@@ -9,7 +9,7 @@ output: html_document
 library(ndtv)
 library(htmlwidgets)
 
-animateCellNetwork <- function(floor, tower, block, dailySubset = FALSE)
+animateCellNetwork <- function(floor, tower, block)
   {
   #Separate out data for the requested block and create ids
   blockData <- m_stdLoc[m_stdLoc$Floor == floor & m_stdLoc$Tower == tower &
@@ -80,13 +80,8 @@ animateCellNetwork <- function(floor, tower, block, dailySubset = FALSE)
                               v = active$id)
 
   #Create animation
-  if (dailySubset == FALSE){
-    slice.par <- list(start = 1, end = 101, interval = 1,
+  slice.par <- list(start = 1, end = max(dates$DayNum), interval = 1,
                       aggregate.dur = 1, rule = "any")
-  } else {
-    slice.par <- list(start = 77, end = 87, interval = 1,
-                      aggregate.dur = 1, rule = "any")
-  }
   render.par <- list(tween.frames = 10, show.time = FALSE)
   plot.par <- list(mar = c(0, 0, 0, 0))
   compute.animation(dynNW, slice.par = slice.par, verbose = FALSE,
@@ -105,6 +100,11 @@ animateCellNetwork <- function(floor, tower, block, dailySubset = FALSE)
     output.mode = "htmlWidget")
 }
 
-animateCellNetwork(floor = 2, tower = 'S', block = 1, dailySubset = TRUE)
-animateCellNetwork(floor = 7, tower = 'S', block = 5, dailySubset = TRUE)
+cat('\n####', 'Floor 2, Tower S, Block 1', '\n')
+animateCellNetwork(floor = 2, tower = 'S', block = 1)
+cat('\n')
+
+cat('\n####', 'Floor 7, Tower S, Block 5', '\n')
+animateCellNetwork(floor = 7, tower = 'S', block = 5)
+cat('\n')
 ```

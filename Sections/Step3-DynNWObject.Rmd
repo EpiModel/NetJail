@@ -16,27 +16,29 @@ cEdges$terminus <- cEdges$lastTime + 1
 cEdges$firstTime <- NULL
 cEdges$lastTime <- NULL
 
-#Load in previously saved dynamic network object
-cDynNW <- readRDS("../cDynNW.rds")
-
-# #Create a dynamic network
-# cNW <- network(cEdges[cEdges$onset == -Inf, c("head", "tail")],
-#                directed = FALSE, vertices = data.frame(name = ids$id))
-# cDynNW <- networkDynamic(base.net = cNW,
-#                          vertex.spells =
-#                             cLocs[, c("onset", "terminus", "id", "loc")],
-#                           edge.spells =
-#                             cEdges[ , c("onset", "terminus", "tail", "head")],
-#                           create.TEAs = TRUE,
-#                           vertex.TEA.names = c("location"))
-# 
-# #Set vertex attributes
-# cDynNW <- set.vertex.attribute(cDynNW, "Race", ids$Race)
-# cDynNW <- set.vertex.attribute(cDynNW, "Age", ids$InitialAge)
-# cDynNW <- set.vertex.attribute(cDynNW, "Gender", ids$Gender)
-# 
-# #Activate vertices
-# cDynNW <- activate.vertices(x = cDynNW, onset = activeDays$onset,
-#                             terminus = activeDays$terminus,
-#                             v = activeDays$id)
+if (LoadPrevDynNWObj == TRUE) {
+  #Load in previously saved dynamic network object (for 10/27 - 02/04)
+  cDynNW <- readRDS("../cDynNW.rds")
+} else {
+  #Create a dynamic network
+  cNW <- network(cEdges[cEdges$onset == -Inf, c("head", "tail")],
+                 directed = FALSE, vertices = data.frame(name = ids$id))
+  cDynNW <- networkDynamic(base.net = cNW,
+                           vertex.spells =
+                             cLocs[, c("onset", "terminus", "id", "loc")],
+                           edge.spells =
+                             cEdges[ , c("onset", "terminus", "tail", "head")],
+                           create.TEAs = TRUE,
+                           vertex.TEA.names = c("location"))
+  
+  #Set vertex attributes
+  cDynNW <- set.vertex.attribute(cDynNW, "Race", ids$Race)
+  cDynNW <- set.vertex.attribute(cDynNW, "Age", ids$InitialAge)
+  cDynNW <- set.vertex.attribute(cDynNW, "Gender", ids$Gender)
+  
+  #Activate vertices
+  cDynNW <- activate.vertices(x = cDynNW, onset = activeDays$onset,
+                              terminus = activeDays$terminus,
+                              v = activeDays$id)
+}
 ```

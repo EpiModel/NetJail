@@ -26,7 +26,6 @@ remove(dist, i, currentNW)
 
 #Histograms:
 par(mfrow = c(3,2))
-days <- c(1, 2, 5, 11, 17, 25) #Day indices, not day numbers
 for (i in seq_along(days)) {
   barplot(cDegDists[, (days[i] + 1)], names.arg = cDegDists$deg, 
           xlab = "Degree", ylab = "Frequency", 
@@ -52,7 +51,7 @@ ggplot(cMeanDeg,aes(x=dates.Date)) +
   geom_boxplot(aes(lower=(cMeanDeg-sd), upper=(cMeanDeg+sd), middle=cMeanDeg, 
                    ymin=min, ymax=max, group = dates.Date), 
                stat="identity") + 
-  ggtitle("Mean degree (with SD) over time") +
+  ggtitle("Mean degree (with Std. Dev.) over time") +
   xlab("Date") + ylab("Degree")
 
 #Create scatterplot of mean degree
@@ -61,13 +60,9 @@ plot(x = cMeanDeg$dates.Date, y = cMeanDeg$cMeanDeg,
      xlab = "Date", ylab = "Mean Degree",
      main = "Mean degree over time")
 
-#Mean degree averaged across all days of data
+#Mean degree averaged across all (selected) days of data
 cOverallMeanDeg <- mean(cMeanDeg$cMeanDeg)
-print(paste0("The mean degree averaged across all days of data is ", 
-             round(cOverallMeanDeg, digits = 4), " edges per node."))
-
-#Mean degree averaged across the daily subset of data
-cSubsetMeanDeg <- mean(cMeanDeg$cMeanDeg[12:22])
-print(paste0("The mean degree averaged across the days from 01/11 to 01/21 is ", 
-             round(cSubsetMeanDeg, digits = 4), " edges per node."))
+print(paste0("The mean degree averaged across the days from ", firstDay, " to ", 
+             lastDay, " is ", round(cOverallMeanDeg, digits = 4), 
+             " edges per node."))
 ```
