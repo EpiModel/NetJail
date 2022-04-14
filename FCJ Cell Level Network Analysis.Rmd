@@ -15,11 +15,10 @@ lastDay <- as.Date("2022-02-04")
 
 days <- c(1, 2, 5, 11, 17, 25) #Day indices for degree dist plots -- ideally 6
 
-LoadPrevDynNWObj <- TRUE
+LoadPrevDynNWObj <- TRUE #Set to TRUE iff timeframe is from 10/27 to 02/04
 EstimateLocDurations <- TRUE
 EstimateDurations <- TRUE
 AnalyseShortVsLong <- TRUE
-
 ```
 
 ```{r, results = 'asis', echo = FALSE}
@@ -140,4 +139,15 @@ In the animations below, blue nodes represent Black residents, green nodes repre
 Again, we take the general approach of assuming that if something is the same in two consecutive rosters, then it was also the same in the time between the two rosters. If an edge is present in one roster and not in the next, then it is assumed to have dissolved immediately after the date of the first roster; similarly, if a resident is in the specified block in one roster but not in the next, then they are assumed to have left immediately after the date of the first roster. 
 
 ```{r, child = 'Sections/Step9-Animations.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```
+
+## Step 10: Calculate and visualize age mixing matrix
+
+To analyze the age mixing in our network, we begin by creating a data frame, `doubledEdges`, that contains every edge in `cEdges` twice: once with the node with the smaller `id` as the head, and once with it as the tail. We then merge in the age (broken into 10-year categories) of the head and the tail of each edge. 
+
+We then analyze the age mixing on the first day and the last day of our timeframe of interest. For each time point, we count how many edges there are from each age category to each other age category (e.g., how many edges there are where the head is under 20 and the tail is under 20, how many where the head is under 20 and the tail is 20-29, etc.). We organize this information into a matrix, which will, by definition, be symmetrical (since, for example, every edge from a 20-29 year-old to a 30-39 year-old is also an edge from a 30-39 year-old to a 20-29 year-old.) For each category, we also calculate what proportion of edges from that category are to each other category (e.g., what proportion of edges with a head under 20 has a tail under 20, what proportion has a 20-29 year-old tail, etc.) We also organize this information into a matrix (which will not be symmetrical since the age categories are not evenly sized) with the rows (not the columns) summing to 1. All of this information is then presented in 4 contour plots.
+
+Finally, to see how the age mixing changed from the beginning to the end of our timeframe of interest, we subtract the initial age mixing matrix from the final one and present the result in a contour plot. We do this twice, once using numbers and once using proportions. 
+
+```{r, child = 'Sections/Step10-AgeMixing.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
