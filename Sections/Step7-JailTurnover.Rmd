@@ -8,7 +8,6 @@ output: html_document
 ```{r}
 turnover_rates <- data.frame(Category = rows, Admissions=NA, Releases=NA, 
                              AveragePop = NA, TurnoverIn = NA, TurnoverOut = NA)
-remove(rows)
 
 #OVERALL
 #Calculate # of new admissions (including repeat admissions)
@@ -39,7 +38,7 @@ for (i in seq_along(allRaces)) {
   turnover_rates[turnover_rates$Category == allRaces[i], ]$Releases <- releases
   turnover_rates[turnover_rates$Category == allRaces[i], ]$AveragePop <- avg_pop
 }
-remove(admissions, releases, avg_pop)
+remove(admissions, releases)
 
 #BY AGE
 activeDays_age <- merge(activeDays, ids[ , c("id", "InitialAge")], by = "id")

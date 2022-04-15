@@ -1,16 +1,14 @@
 ---
-title: "Step5-DegreeDistByAttr"
+title: "Step13-BlockDegreeDistByAttr"
 author: "Karina Wallrafen-Sam"
-date: "4/1/2022"
+date: "4/14/2022"
 output: html_document
 ---
 
 ```{r}
-library(gridExtra)
-
 #Degree distribution by attribute: floor, age, race
 for (i in seq_len(nrow(dates))){
-  currNW <- as.network(network.extract(cDynNW, at = dates$DayNum[i]))
+  currNW <- as.network(network.extract(bDynNW, at = dates$DayNum[i]))
   currNodes <- data.frame(id = get.vertex.attribute(currNW, "vertex.names"),
                           race = get.vertex.attribute(currNW, "Race"),
                           age = get.vertex.attribute(currNW, "Age"),
@@ -34,28 +32,29 @@ for (i in seq_len(nrow(dates))){
   names(dist_a)[names(dist_a) == "count"] <- toString(dates$Date[i])
 
   if (i == 1){
-    cDegDists_floor <- dist_f
-    cDegDists_race <- dist_r
-    cDegDists_age <- dist_a
+    bDegDists_floor <- dist_f
+    bDegDists_race <- dist_r
+    bDegDists_age <- dist_a
   } else {
-    cDegDists_floor <- merge(cDegDists_floor, dist_f, by = c("floor", "degree"),
+    bDegDists_floor <- merge(bDegDists_floor, dist_f, by = c("floor", "degree"),
                              all = TRUE)
-    cDegDists_race <- merge(cDegDists_race, dist_r, by = c("race", "degree"),
+    bDegDists_race <- merge(bDegDists_race, dist_r, by = c("race", "degree"),
                             all = TRUE)
-    cDegDists_age <- merge(cDegDists_age, dist_a, by = c("age", "degree"),
+    bDegDists_age <- merge(bDegDists_age, dist_a, by = c("age", "degree"),
                            all = TRUE)
   }
 }
 remove(dist_f, dist_r, dist_a, currNW, currNodes)
 
-cat('\n####', 'Degree Distributions for Selected Floors & Time Points', '\n')
+cat('\n####', 
+    'Block-Level Degree Distributions for Selected Floors & Time Points', '\n')
 #Histograms of degree distribution by floor:
 par(mfrow = c(3,2))
 floors <- c(2, 7)
 for (j in seq_along(floors)) {
   for (i in seq_along(days)) {
-    barplot(cDegDists_floor[cDegDists_floor$floor == floors[j], ][, (days[i] + 2)],
-        names.arg = cDegDists_floor[cDegDists_floor$floor == floors[j], ]$degree,
+    barplot(bDegDists_floor[bDegDists_floor$floor == floors[j], ][, (days[i] + 2)],
+        names.arg = bDegDists_floor[bDegDists_floor$floor == floors[j], ]$degree,
         xlab = "Degree", ylab = "Frequency",
         main = paste("Degree Dist. on", dates$Date[days[i]], "on Floor",
                      floors[j], sep=" "))
@@ -64,13 +63,14 @@ for (j in seq_along(floors)) {
 cat('\n')
 
 #Histograms of degree distribution by race:
-cat('\n####', 'Degree Distributions for Selected Races & Time Points', '\n')
+cat('\n####', 
+    'Block-Level Degree Distributions for Selected Races & Time Points', '\n')
 par(mfrow = c(3,2))
 races <- c("Black", "White")
 for (j in seq_along(races)) {
   for (i in seq_along(days)) {
-    barplot(cDegDists_race[cDegDists_race$race == races[j], ][, (days[i] + 2)],
-        names.arg = cDegDists_race[cDegDists_race$race == races[j], ]$degree,
+    barplot(bDegDists_race[bDegDists_race$race == races[j], ][, (days[i] + 2)],
+        names.arg = bDegDists_race[bDegDists_race$race == races[j], ]$degree,
         xlab = "Degree", ylab = "Frequency",
         main = paste("Degree Dist. on", dates$Date[days[i]], "for",
                      races[j], "Residents", sep=" "))
@@ -79,13 +79,15 @@ for (j in seq_along(races)) {
 cat('\n')
 
 #Histograms of degree distribution by age:
-cat('\n####', 'Degree Distributions for Selected Age Groups & Time Points', '\n')
+cat('\n####', 
+    'Block-Level Degree Distributions for Selected Age Groups & Time Points', 
+    '\n')
 par(mfrow = c(3,2))
 ages <- c("20 - 29", "40 - 49")
 for (j in seq_along(ages)) {
   for (i in seq_along(days)) {
-    barplot(cDegDists_age[cDegDists_age$age == ages[j], ][, (days[i] + 2)],
-        names.arg = cDegDists_age[cDegDists_age$age == ages[j], ]$degree,
+    barplot(bDegDists_age[bDegDists_age$age == ages[j], ][, (days[i] + 2)],
+        names.arg = bDegDists_age[bDegDists_age$age == ages[j], ]$degree,
         xlab = "Degree", ylab = "Frequency",
         main = paste("Degree Dist. on", dates$Date[days[i]],
                      "for", ages[j], "Yr. Olds", sep=" "))
@@ -94,157 +96,161 @@ for (j in seq_along(ages)) {
 cat('\n')
 
 #Mean degree by floor at each time point
-cDegDists_floor2 <- gather(cDegDists_floor, key = "Date", value = "Number", 
+bDegDists_floor2 <- gather(bDegDists_floor, key = "Date", value = "Number", 
                           -floor, -degree)
-cDegDists_floor2$Date <- as.Date(cDegDists_floor2$Date)
-cDegDists_floor2 <- cDegDists_floor2[complete.cases(cDegDists_floor2), ]
-cMeanDeg_floor <- cDegDists_floor2 %>% group_by(floor, Date) %>% 
+bDegDists_floor2$Date <- as.Date(bDegDists_floor2$Date)
+bDegDists_floor2 <- bDegDists_floor2[complete.cases(bDegDists_floor2), ]
+bMeanDeg_floor <- bDegDists_floor2 %>% group_by(floor, Date) %>% 
   summarise(MeanDeg = weighted.mean(degree, Number), 
             SD = SD(degree, weights = Number), min = min(degree), 
             max = max(degree))
-cat('\n####', 'Mean Degree over Time by Floor', '\n')
+cat('\n####', 'Block-Level Mean Degree over Time by Floor', '\n')
 par(mfrow = c(2,2))
 floors <- 1:7
-max.y <- round(max(cMeanDeg_floor$MeanDeg), 1)
-min.y <- floor(min(cMeanDeg_floor$MeanDeg) * 10) / 10
+max.y <- round(max(bMeanDeg_floor$MeanDeg), 1)
+min.y <- floor(min(bMeanDeg_floor$MeanDeg) * 10) / 10
 for (i in seq_along(floors)) {
-    plot(cMeanDeg_floor[cMeanDeg_floor$floor == floors[i], ]$Date, 
-         y = cMeanDeg_floor[cMeanDeg_floor$floor == floors[i], ]$MeanDeg,
+    plot(bMeanDeg_floor[bMeanDeg_floor$floor == floors[i], ]$Date, 
+         y = bMeanDeg_floor[bMeanDeg_floor$floor == floors[i], ]$MeanDeg,
          xlab = "Date", ylab = "Mean Degree", 
          main = paste("Mean degree over time for floor", floors[i], sep=" "),
          ylim = c(min.y, max.y))
 }
 plot.new()
-max.y <- max(cMeanDeg_floor$max)
+max.y <- max(bMeanDeg_floor$max)
+min.y <- min(bMeanDeg_floor$min)
 for (i in seq_along(floors)){
-  temp <- cMeanDeg_floor[cMeanDeg_floor$floor == floors[i], ]
+  temp <- bMeanDeg_floor[bMeanDeg_floor$floor == floors[i], ]
   g <- (ggplot(temp,aes(x=Date)) + 
     geom_boxplot(aes(lower=(MeanDeg-SD), upper=(MeanDeg+SD), middle=MeanDeg, 
                      ymin=min, ymax=max, group = Date), stat="identity") + 
     ggtitle(paste("Mean degree over time for floor", floors[i], sep=" ")) + 
-    xlab("Date") + ylab("Degree") + ylim(NA, max.y))
+    xlab("Date") + ylab("Degree") + ylim(min.y, max.y))
   assign(paste0("f", i), g)
 }
 grid.arrange(f1, f2, f3, f4, ncol = 2)
 grid.arrange(f5, f6, f7, ncol = 2)
-remove(cDegDists_floor2, temp, f1, f2, f3, f4, f5, f6, f7)
+remove(bDegDists_floor2, temp, f1, f2, f3, f4, f5, f6, f7)
 cat('\n')
 
 #Mean degree by race at each time point
-cDegDists_race2 <- gather(cDegDists_race, key = "Date", value = "Number", 
+bDegDists_race2 <- gather(bDegDists_race, key = "Date", value = "Number", 
                           -race, -degree)
-cDegDists_race2$Date <- as.Date(cDegDists_race2$Date)
-cDegDists_race2 <- cDegDists_race2[complete.cases(cDegDists_race2), ]
-cMeanDeg_race <- cDegDists_race2 %>% group_by(race, Date) %>% 
+bDegDists_race2$Date <- as.Date(bDegDists_race2$Date)
+bDegDists_race2 <- bDegDists_race2[complete.cases(bDegDists_race2), ]
+bMeanDeg_race <- bDegDists_race2 %>% group_by(race, Date) %>% 
   summarise(MeanDeg = weighted.mean(degree, Number), 
             SD = SD(degree, weights = Number), min = min(degree),
             max = max(degree))
 races <- c("Black", "White", "Other")
-cat('\n####', 'Mean Degree over Time by Race', '\n')
-max.y <- round(max(cMeanDeg_race$MeanDeg), 1)
-min.y <- floor(min(cMeanDeg_race$MeanDeg) * 10) / 10
+cat('\n####', 'Block-Level Mean Degree over Time by Race', '\n')
+max.y <- round(max(bMeanDeg_race$MeanDeg), 1)
+min.y <- floor(min(bMeanDeg_race$MeanDeg) * 10) / 10
 par(mfrow = c(2,2))
 for (i in seq_along(races)) {
-    plot(cMeanDeg_race[cMeanDeg_race$race == races[i], ]$Date,
-     y = cMeanDeg_race[cMeanDeg_race$race == races[i], ]$MeanDeg,
+    plot(bMeanDeg_race[bMeanDeg_race$race == races[i], ]$Date,
+     y = bMeanDeg_race[bMeanDeg_race$race == races[i], ]$MeanDeg,
      xlab = "Date", ylab = "Mean Degree", 
      main = paste("Mean Deg. over Time -", races[i], sep = " "),
      ylim = c(min.y, max.y)) 
 }
 plot.new()
-max.y <- max(cMeanDeg_race$max)
+min.y <- min(bMeanDeg_race$min)
+max.y <- max(bMeanDeg_race$max)
 for (i in seq_along(races)){
-  temp <- cMeanDeg_race[cMeanDeg_race$race == races[i], ]
+  temp <- bMeanDeg_race[bMeanDeg_race$race == races[i], ]
   g <- (ggplot(temp,aes(x=Date)) + 
           geom_boxplot(aes(lower=(MeanDeg-SD), upper=(MeanDeg+SD), 
                    middle=MeanDeg, ymin=min, ymax=max, group = Date), 
                stat="identity") + 
           ggtitle(paste("Mean degree over time -", races[i], sep=" ")) + 
-          xlab("Date") + ylab("Degree") + ylim(NA, max.y))
+          xlab("Date") + ylab("Degree") + ylim(min.y, max.y))
   assign(paste0("r", i), g)
 }
 grid.arrange(r1, r2, r3, ncol = 2)
-remove(cDegDists_race2, temp, r1, r2, r3)
+remove(bDegDists_race2, temp, r1, r2, r3)
 cat('\n')
 
 #Mean degree by age at each time point
-cDegDists_age2 <- gather(cDegDists_age, key = "Date", value = "Number", 
+bDegDists_age2 <- gather(bDegDists_age, key = "Date", value = "Number", 
                           -age, -degree)
-cDegDists_age2$Date <- as.Date(cDegDists_age2$Date)
-cDegDists_age2 <- cDegDists_age2[complete.cases(cDegDists_age2), ]
-cMeanDeg_age <- cDegDists_age2 %>% group_by(age, Date) %>% 
+bDegDists_age2$Date <- as.Date(bDegDists_age2$Date)
+bDegDists_age2 <- bDegDists_age2[complete.cases(bDegDists_age2), ]
+bMeanDeg_age <- bDegDists_age2 %>% group_by(age, Date) %>% 
   summarise(MeanDeg = weighted.mean(degree, Number), 
             SD = SD(degree, weights = Number), min = min(degree),
             max = max(degree))
 ages <- c("Under 20", "20 - 29", "30 - 39", "40 - 49", "50 - 59", "60+")
-cat('\n####', 'Mean Degree over Time by Age Group', '\n')
-max.y <- round(max(cMeanDeg_age$MeanDeg), 1)
-min.y <- floor(min(cMeanDeg_age$MeanDeg) * 10) / 10
+cat('\n####', 'Block-Level Mean Degree over Time by Age Group', '\n')
+max.y <- round(max(bMeanDeg_age$MeanDeg), 1)
+min.y <- floor(min(bMeanDeg_age$MeanDeg) * 10) / 10
 par(mfrow = c(2,2))
 plot.new()
 for (i in seq_along(ages)) {
-    plot(cMeanDeg_age[cMeanDeg_age$age == ages[i], ]$Date,
-     y = cMeanDeg_age[cMeanDeg_age$age == ages[i], ]$MeanDeg,
+    plot(bMeanDeg_age[bMeanDeg_age$age == ages[i], ]$Date,
+     y = bMeanDeg_age[bMeanDeg_age$age == ages[i], ]$MeanDeg,
      xlab = "Date", ylab = "Mean Degree", 
      main = paste("Mean Deg. over Time - Age", ages[i], 
                   sep = " "), 
      ylim = c(min.y, max.y))
 }
 plot.new()
-max.y <- max(cMeanDeg_age$max)
+min.y <- min(bMeanDeg_age$min)
+max.y <- max(bMeanDeg_age$max)
 for (i in seq_along(ages)){
-  temp <- cMeanDeg_age[cMeanDeg_age$age == ages[i], ]
+  temp <- bMeanDeg_age[bMeanDeg_age$age == ages[i], ]
   g <- (ggplot(temp,aes(x=Date)) + 
           geom_boxplot(aes(lower=(MeanDeg-SD), upper=(MeanDeg+SD), 
                    middle=MeanDeg, ymin=min, ymax=max, group = Date), 
                stat="identity") + 
           ggtitle(paste("Mean degree over time - Age", ages[i], sep=" ")) +
-          xlab("Date") + ylab("Degree") + ylim(NA, max.y))
+          xlab("Date") + ylab("Degree") + ylim(min.y, max.y))
   assign(paste0("a", i), g)
 }
 grid.arrange(a1, a2, a3, a4, ncol = 2)
 grid.arrange(a5, a6, ncol = 2, heights=unit(0.5, "npc"))
-remove(cDegDists_age2, a1, a2, a3, a4, a5, a6, g, temp)
+remove(bDegDists_age2, a1, a2, a3, a4, a5, a6, g, temp)
 cat('\n')
 
 #Mean degree by floor averaged across all data
-cOverallMeanDeg_floor <- cMeanDeg_floor %>% group_by(floor) %>% 
+bOverallMeanDeg_floor <- bMeanDeg_floor %>% group_by(floor) %>% 
   summarise(OverallMeanDeg = mean(MeanDeg), sd = sd(MeanDeg), 
             min = min(MeanDeg), max = max(MeanDeg))
-cat('\n####', 'Mean Degree Averaged Across Selected Timespan (by Attribute)', 
+cat('\n####', 
+    'Block-Level Mean Degree Averaged Across Selected Timespan (by Attribute)', 
     '\n')
 par(mfrow = c(1,1))
-ggplot(cOverallMeanDeg_floor,aes(x=floor)) + 
+ggplot(bOverallMeanDeg_floor,aes(x=floor)) + 
   geom_boxplot(aes(lower=(OverallMeanDeg-sd), upper=(OverallMeanDeg+sd), 
                    middle=OverallMeanDeg, ymin=min, ymax=max, group = floor), 
                stat="identity") + 
-  ggtitle(paste0("Mean degree averaged across ", firstDay, " to ", 
+  ggtitle(paste0("Block-level mean degree averaged across ", firstDay, " to ", 
              lastDay, " by Floor")) +
   xlab("Floor") + ylab("Mean Degree")
 
 #Mean degree by race averaged across all data 
-cOverallMeanDeg_race <- cMeanDeg_race %>% group_by(race) %>% 
+bOverallMeanDeg_race <- bMeanDeg_race %>% group_by(race) %>% 
   summarise(OverallMeanDeg = mean(MeanDeg), sd = sd(MeanDeg), 
             min = min(MeanDeg), max = max(MeanDeg))
 par(mfrow = c(1,1))
-ggplot(cOverallMeanDeg_race,aes(x=race)) + 
+ggplot(bOverallMeanDeg_race,aes(x=race)) + 
   geom_boxplot(aes(lower=(OverallMeanDeg-sd), upper=(OverallMeanDeg+sd), 
                    middle=OverallMeanDeg, ymin=min, ymax=max, group = race), 
                stat="identity") + 
-  ggtitle(paste0("Mean degree averaged across ", firstDay, " to ", 
+  ggtitle(paste0("Block-level mean degree averaged across ", firstDay, " to ", 
              lastDay, " by Race")) +
   xlab("Race") + ylab("Mean Degree")
 
 #Mean degree by age across all data
-cOverallMeanDeg_age <- cMeanDeg_age %>% group_by(age) %>% 
+bOverallMeanDeg_age <- bMeanDeg_age %>% group_by(age) %>% 
   summarise(OverallMeanDeg = mean(MeanDeg), sd = sd(MeanDeg),
             min = min(MeanDeg), max = max(MeanDeg))
 par(mfrow = c(1,1))
-ggplot(cOverallMeanDeg_age,aes(x=age)) + 
+ggplot(bOverallMeanDeg_age,aes(x=age)) + 
   geom_boxplot(aes(lower=(OverallMeanDeg-sd), upper=(OverallMeanDeg+sd), 
                    middle=OverallMeanDeg, ymin=min, ymax=max, group = age), 
                stat="identity") + 
-  ggtitle(paste0("Mean degree averaged across ", firstDay, " to ", 
+  ggtitle(paste0("Block-level mean degree averaged across ", firstDay, " to ", 
              lastDay, " by Age")) +
   xlab("Age") + ylab("Mean Degree")
 cat('\n')

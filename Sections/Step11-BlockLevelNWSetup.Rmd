@@ -1,0 +1,73 @@
+---
+title: "Step11-BlockLevelNWSetup"
+author: "Karina Wallrafen-Sam"
+date: "4/14/2022"
+output: html_document
+---
+
+```{r}
+#Create edge list for block-level edges
+
+#Merge in ids; combine floor, tower, and block into one column
+bDailyLoc <- merge(m_stdLoc, ids, by = "SoNum")[, c("id", "Date", "Floor",
+                                                    "Tower", "Block")]
+bDailyLoc$loc <- paste(bDailyLoc$Floor, bDailyLoc$Tower, bDailyLoc$Block)
+bDailyLoc <- bDailyLoc[ , c("id", "Date", "loc")]
+
+#Create pairs of residents who were ever in the same cell on the same day
+bPairs <- merge(bDailyLoc, bDailyLoc, by = c("Date", "loc"))
+bPairs <- subset(bPairs, (id.x < id.y))
+bPairs <- merge(bPairs, dates, by = "Date")
+
+#Flag rows if the pair is the same as the previous row and there's no time gap
+bPairs <- bPairs[with(bPairs, order(id.x, id.y, DayIndex)), ]
+ind <- which(bPairs$id.x==lag(bPairs$id.x) & bPairs$id.y==lag(bPairs$id.y) &
+               bPairs$loc==lag(bPairs$loc) &
+               bPairs$DayIndex==(lag(bPairs$DayIndex) + 1))
+bPairs$newContact <- "True"
+bPairs[ind, ]$newContact <- "False"
+
+#Create a counter that increments for every new contact; remove helper col
+bPairs$contactCounter <- cumsum(bPairs$newContact == "True")
+bPairs$newContact <- NULL
+
+#List out each contact w/head, tail, start, end, and censoring flags
+bEdges <- bPairs %>% group_by(contactCounter) %>%
+  summarise(head = first(id.x), tail = first(id.y),
+            firstTime = min(DayNum), lastTime = max(DayNum),
+            location = first(loc))
+bEdges$contactCounter <- NULL
+bEdges$startCensored <- "N"
+bEdges$startCensored[bEdges$firstTime == min(bEdges$firstTime) ] <- "Y"
+bEdges$endCensored <- "N"
+bEdges$endCensored[bEdges$lastTime == max(bEdges$lastTime) ] <- "Y"
+
+remove(bPairs, ind)
+
+#Adjust data frame of edges
+bEdges <- transform(bEdges, onset = as.numeric(firstTime))
+bEdges <- within(bEdges, onset[startCensored == 'Y'] <- -Inf)
+bEdges <- within(bEdges, lastTime[endCensored == 'Y'] <- Inf)
+bEdges$terminus <- bEdges$lastTime + 1
+bEdges$firstTime <- NULL
+bEdges$lastTime <- NULL
+
+#Create dynamic network object
+if (firstDay == as.Date("2021-10-27") & lastDay == as.Date("2022-02-04")) {
+  #Load in previously created dynamic network object
+  load("../bDynNW.Rds")
+
+  #Set vertex attributes
+  bDynNW <- set.vertex.attribute(bDynNW, "Race", ids$Race)
+  bDynNW <- set.vertex.attribute(bDynNW, "Age", ids$InitialAge)
+  bDynNW <- set.vertex.attribute(bDynNW, "Gender", ids$Gender)
+
+  #Activate vertices
+  bDynNW <- activate.vertices(x = bDynNW, onset = activeDays$onset,
+                              terminus = activeDays$terminus,
+                              v = activeDays$id)
+} else {
+  warning("Block-level dynamic network object not available for this timeframe")
+}
+
+```

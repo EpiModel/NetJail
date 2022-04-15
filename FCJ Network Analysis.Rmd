@@ -1,5 +1,5 @@
 ---
-title: "FCJ Cell-Level Network Analysis"
+title: "FCJ Network Analysis"
 author: "Karina Wallrafen-Sam"
 date: "3/24/2022"
 output: html_document
@@ -15,7 +15,6 @@ lastDay <- as.Date("2022-02-04")
 
 days <- c(1, 2, 5, 11, 17, 25) #Day indices for degree dist plots -- ideally 6
 
-LoadPrevDynNWObj <- TRUE #Set to TRUE iff timeframe is from 10/27 to 02/04
 EstimateLocDurations <- TRUE
 EstimateDurations <- TRUE
 AnalyseShortVsLong <- TRUE
@@ -46,7 +45,7 @@ We create `dates`, which assigns two numerical values to each date for which we 
 
 In order to list out all cell-level edges, we start by merging `cDailyLoc` (which is basically `m_stdLoc` but with the columns reorganized) with itself and only keep rows where `id.x` is less than `id.y`. This gives us a list of pairs of residents who were ever in the same cell on the same day. We then create a counter that increments every time (a) the pairing changes, (b) there's a time gap, OR (c) the location changes. (a) is self-explanatory. (b) means that if we are looking at the original full dataset and Person A and Person B were in a cell together in Roster 1 (on 10/27, or Day 1), NOT in a cell together in Roster 2 (on 12/01, or Day 36), and in a cell together again in Roster 3 (on 12/08, or Day 43), then we create one edge between A and B that is present on Day 1 (10/27) and gone on Day 2 (10/28) and another that forms on Day 43 (12/08). (c) means that if we are looking at the original full dataset and Person A and Person B were in Cell 1 together in Roster 1 (on 10/27, or Day 1) and in Cell 2 together in Roster 2 (on 12/01, or Day 36), we create one edge between A and B that is present on Day 1 (10/27) and gone on Day 2 (10/28) and another that forms on Day 36 (12/01). 
 
-Once we have this counter, creating the edge list is straightforward: we group on the counter and list out the id for the head, the id for the tail, the day number on which the edge is first present, and the day number on which the edge is last present. We also note if edges are left-censored and/or right-censored. This information is stored in `cEdges`. 
+Once we have this counter, creating the cell-level edge list is straightforward: we group on the counter and list out the id for the head, the id for the tail, the day number on which the edge is first present, and the day number on which the edge is last present. We also note if edges are left-censored and/or right-censored. This information is stored in `cEdges`. 
 
 ```{r, child = 'Sections/Step1-EdgeList.Rmd', include = FALSE}
 ```
@@ -64,27 +63,27 @@ We thus consider them 'active' until Day 36 (inclusive) and from Day 87 on. We c
 ```{r, child = 'Sections/Step2-ActiveSpells.Rmd', include = FALSE}
 ```
 
-## Step 3: Create a dynamic network object
+## Step 3: Create a dynamic network object for cell-level network
 
-In order to create a `networkDynamic` object, we first need to manipulate `cEdges` a bit. We replace the column `lastTime` (the last day on which the edge is present) with `terminus` (the day *after* last day on which the edge is present, which is the day on which the edge should dissolve) and change the column name `startTime` to `onset` for consistency (it's the same column, though). We also change the `onset` value to `-Inf` for left-censored edges and the `terminus` value to `Inf` for right-censored edges (this is probably unnecessary).
+In order to create a `networkDynamic` object for the cell-level network, we first need to manipulate `cEdges` a bit. We replace the column `lastTime` (the last day on which the edge is present) with `terminus` (the day *after* last day on which the edge is present, which is the day on which the edge should dissolve) and change the column name `startTime` to `onset` for consistency (it's the same column, though). We also change the `onset` value to `-Inf` for left-censored edges and the `terminus` value to `Inf` for right-censored edges (although this is probably unnecessary).
 
 We then need to create a static network that's the same size as the dynamic network we're going to create. This is very annoying because it makes the code much slower for some reason, but it seems to be the only way to specify that our network is not directed, which is important. 
 
-Then we're ready to create our `networkDynamic` object. We use the `cLocs` data frame we created in Step 2 to create a dynamic (TEA) node attribute called `location`. We also set age, race, and gender as (static) vertex attributes. (Each person's age is calculated as of the first day that they appear in the data. Some of the residents may have a birthday during the time period we're considering, but we ignore that.) Finally, we activate nodes based on the data in `activeDays`. 
+Then we're ready to create our cell-level `networkDynamic` object. We use the `cLocs` data frame we created in Step 2 to create a dynamic (TEA) node attribute called `location`. We also set age, race, and gender as (static) vertex attributes. (Each person's age is calculated as of the first day that they appear in the data. Some of the residents may have a birthday during the time period we're considering, but we ignore that.) Finally, we activate nodes based on the data in `activeDays`. 
 
 ```{r, child = 'Sections/Step3-DynNWObject.Rmd', include = FALSE}
 ```
 
-## Step 4: Calculate overall degree distribution
+## Step 4: Calculate overall degree distribution for cell-level network
 
-To calculate the degree distribution over time, we extract the network at each time point for which we have a roster and use the `degreedist()` function on the extracted networks. We plot the degree distribution at a few selected time points. We also calculate the mean degree at each time point for which we have a roster and display these values in both a box plot and a scatter plot. In the box plot, each 'box' spans from the mean minus one standard deviation to the mean plus one standard deviation at that time point (with the lines spanning from minimum to maximum at each time point). Since the degree distributions are so right-skewed, the mean minus one standard deviation is often less than 0 (although of course no node has a degree less than 0).
+To calculate the cell-level degree distribution over time, we extract the cell-level network at each time point for which we have a roster and use the `degreedist()` function on the extracted networks. We plot the degree distribution at a few selected time points. We also calculate the mean degree at each time point for which we have a roster and display these values in both a box plot and a scatter plot. In the box plot, each 'box' spans from the mean minus one standard deviation to the mean plus one standard deviation at that time point (with the lines spanning from minimum to maximum at each time point). Since the degree distributions are so right-skewed, the mean minus one standard deviation is often less than 0 (although of course no node has a degree less than 0).
 
-`cOverallMeanDeg` is a simple, un-weighted average of these mean degree values (each day is weighted equally, without regard for changing network size.)
+`cOverallMeanDeg` is a simple, un-weighted average of these mean degree values (each day is weighted equally, without regard for changing network size.) This represents how many cell-level edges the average resident has on the average day. 
 
 ```{r, child = 'Sections/Step4-DegreeDist.Rmd', echo = FALSE, message = FALSE, warning = FALSE}
 ```
 
-## Step 5: Calculate degree distribution by attribute
+## Step 5: Calculate degree distribution by attribute for cell-level network
 
 In Step 5, we perform the same operations as in Step 4, but broken down by race (a fixed attribute), age (which we are treating as a fixed attribute), and floor (a time-varying attribute, which we extract at each time point for which we have a roster). We break age into 10-year age categories and divide race into Black, White, and Other.
 
@@ -141,9 +140,9 @@ Again, we take the general approach of assuming that if something is the same in
 ```{r, child = 'Sections/Step9-Animations.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
 
-## Step 10: Calculate and visualize age mixing matrix
+## Step 10: Calculate and visualize age mixing matrix (for cell-level network)
 
-To analyze the age mixing in our network, we begin by creating a data frame, `doubledEdges`, that contains every edge in `cEdges` twice: once with the node with the smaller `id` as the head, and once with it as the tail. We then merge in the age (broken into 10-year categories) of the head and the tail of each edge. 
+To analyze the age mixing in our cell-level network, we begin by creating a data frame, `doubledEdges`, that contains every edge in `cEdges` twice: once with the node with the smaller `id` as the head, and once with it as the tail. We then merge in the age (broken into 10-year categories) of the head and the tail of each edge. 
 
 We then analyze the age mixing on the first day and the last day of our timeframe of interest. For each time point, we count how many edges there are from each age category to each other age category (e.g., how many edges there are where the head is under 20 and the tail is under 20, how many where the head is under 20 and the tail is 20-29, etc.). We organize this information into a matrix, which will, by definition, be symmetrical (since, for example, every edge from a 20-29 year-old to a 30-39 year-old is also an edge from a 30-39 year-old to a 20-29 year-old.) For each category, we also calculate what proportion of edges from that category are to each other category (e.g., what proportion of edges with a head under 20 has a tail under 20, what proportion has a 20-29 year-old tail, etc.) We also organize this information into a matrix (which will not be symmetrical since the age categories are not evenly sized) with the rows (not the columns) summing to 1. All of this information is then presented in 4 contour plots.
 
@@ -151,3 +150,32 @@ Finally, to see how the age mixing changed from the beginning to the end of our 
 
 ```{r, child = 'Sections/Step10-AgeMixing.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
+
+## Step 11: Create edge list and dynamic network object for block-level network
+
+To create the edge list of block-level edges, we use the same approach we used for the cell-level network in Step 1 (and Step 3). We store the block-level edge list in `bEdges`.
+
+Because the block-level network is huge, it is impractical to create a block-level `networkDynamic` object here, so we load in a previously created object instead. Currently, a block-level `networkDynamic` object (`bDynNW`) is only available for the 10/27 - 02/04 time frame, so if a different time frame has been specified, then degree distributions, etc. will not be calculated for the block-level network. (Like `cDynNW`, `bDynNW` has a dynamic (TEA) node attribute called `location` (crated from `cLocs`) that tells us what cell (NOT block) the node is in when known/assumed.)
+
+Once `bDynNW`  has been loaded, we set age, race, and gender as (static) vertex attributes and activate nodes based on `activeDays` as we did in Step 3 for the cell-level network.
+
+```{r, child = 'Sections/Step11-BlockLevelNWSetup.Rmd', include = FALSE}
+```
+
+## Step 12: Calculate overall degree distribution for block-level network
+
+To calculate the block-level degree distribution over time, we adapt the same approach that we used in Step 4 to calculate the cell-level degree distribution. 
+
+`bOverallMeanDeg` is analogous to `cOverallMeanDeg`: a simple, un-weighted average of the (block-level) mean degree at each time point. It represents how many block-level edges the average resident has on the average day. 
+
+```{r, child = 'Sections/Step12-BlockLevelDegreeDist.Rmd', echo = FALSE, message = FALSE, warning = FALSE}
+```
+
+## Step 13: Calculate degree distribution by attribute for block-level network
+
+In Step 13, we perform the same operations as in Step 12, but broken down by race, age, and floor. As in Step 5, we break age into 10-year age categories and divide race into Black, White, and Other.
+
+```{r, child = 'Sections/Step13-BlockDegreeDistByAttr.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```
+
+## Step 14: Estimate rate of block changes within jail

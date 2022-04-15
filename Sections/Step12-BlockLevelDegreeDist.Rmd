@@ -1,0 +1,67 @@
+---
+title: "Step12-BlockLevelDegreeDist"
+author: "Karina Wallrafen-Sam"
+date: "4/14/2022"
+output: html_document
+---
+
+```{r}
+#Overall degree distribution at each time point
+for (i in seq_len(nrow(dates))){
+  currentNW <- as.network(network.extract(bDynNW, at = dates$DayNum[i]))
+  dist <- degreedist(currentNW, print = FALSE)
+  dist <- data.frame(deg = as.integer(substr(names(dist), 7, 8)),
+                     num = as.integer(dist))
+  names(dist)[names(dist) == "num"] <- toString(dates$Date[i])
+  if (i == 1) {
+    bDegDists <- dist
+  } else {
+    bDegDists <- merge(bDegDists, dist, by = "deg", all = TRUE)
+  }
+}
+remove(dist, i, currentNW)
+
+#Histograms:
+par(mfrow = c(3,2))
+for (i in seq_along(days)) {
+  barplot(bDegDists[, (days[i] + 1)], names.arg = bDegDists$deg, 
+          xlab = "Degree", ylab = "Frequency", 
+          main = paste("Block-Level Degree Distribution on", 
+                       dates$Date[days[i]], sep=" "))
+}
+
+#Mean degree (& standard dev of degree) at each time point
+bDegDists[is.na(bDegDists)] <- 0 
+bMeanDeg <- lapply(bDegDists[ , -1], function(x) 
+  weighted.mean(x = bDegDists$deg, w = x))
+bMeanDeg <- do.call(rbind, bMeanDeg)
+bMeanDeg <- data.frame(dates$Date, bMeanDeg)
+bMeanDeg$sd <- as.numeric(lapply(bDegDists[ , -1], function(x) 
+  SD(x = bDegDists$deg, weights = x)))
+bMeanDeg$max <- as.numeric(lapply(bDegDists[ , -1], function(x) 
+  max(bDegDists[x != 0, ]$deg)))
+bMeanDeg$min <- as.numeric(lapply(bDegDists[ , -1], function(x) 
+  min(bDegDists[x != 0, ]$deg)))
+
+#Create box plot of mean degree
+par(mfrow = c(1,1))
+ggplot(bMeanDeg,aes(x=dates.Date)) + 
+  geom_boxplot(aes(lower=(bMeanDeg-sd), upper=(bMeanDeg+sd), middle=bMeanDeg, 
+                   ymin=min, ymax=max, group = dates.Date), 
+               stat="identity") + 
+  ggtitle("Block-level mean degree (with Std. Dev.) over time") +
+  xlab("Date") + ylab("Block-Level Degree")
+
+#Create scatterplot of mean degree
+par(mfrow = c(1,1))
+plot(x = bMeanDeg$dates.Date, y = bMeanDeg$bMeanDeg, 
+     xlab = "Date", ylab = "Block-Level Mean Degree",
+     main = "Block-level mean degree over time")
+
+#Mean degree averaged across all (selected) days of data
+bOverallMeanDeg <- mean(bMeanDeg$bMeanDeg)
+print(paste0("The block-level mean degree averaged across the days from ", 
+             firstDay, " to ", lastDay, " is ", 
+             round(bOverallMeanDeg, digits = 4), " edges per node."))
+```
+

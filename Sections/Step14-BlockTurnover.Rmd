@@ -1,36 +1,42 @@
 ---
-title: "Step6-CellTurnover"
+title: "Step14-BlockTurnover"
 author: "Karina Wallrafen-Sam"
-date: "4/1/2022"
+date: "4/15/2022"
 output: html_document
 ---
 
 ```{r}
-allFloors <- unique(cDegDists_floor[["floor"]])           
-allRaces <- unique(cDegDists_race[["race"]])
-allAges <- unique(cDegDists_age[["age"]])
-rows <- c("Overall", paste("Floor", allFloors, sep=" "), allRaces, 
-          paste("Age", allAges, sep=" "))
-cell_changes <- data.frame(Category = rows, LocChanges=NA, AveragePop=NA, 
-                           CellChangeRate = NA)
+#Create bLocs
+bLocs <- merge(bDailyLoc, dates, by = "Date")
+bLocs <- bLocs[with(bLocs, order(id, DayIndex)), ]
+ind <- which(bLocs$id==lag(bLocs$id) & bLocs$loc==lag(bLocs$loc) &
+               bLocs$DayIndex==(lag(bLocs$DayIndex) + 1))
+bLocs$newLoc <- "True"
+bLocs[ind, ]$newLoc <- "False"
+bLocs$locCounter <- cumsum(bLocs$newLoc == "True")
+bLocs$newLoc <- NULL
+remove(ind)
+bLocs <- bLocs %>% group_by(locCounter) %>%
+  summarise(id = first(id), loc = first(loc), onset = min(DayNum),
+            terminus = max(DayNum) + 1)
+bLocs$locCounter <- NULL
+bLocs$onset[bLocs$onset == min(bLocs$onset) ] <- -Inf
+bLocs$terminus[bLocs$terminus == max(bLocs$terminus) ] <- Inf
+bLocs <- transform(bLocs, id = as.numeric(id))
+
+block_changes <- data.frame(Category = rows, LocChanges=NA, AveragePop=NA, 
+                           BlockChangeRate = NA)
 
 #OVERALL
 #Count up the total # of times a location spell ended w/o a corresponding active 
 #spell ending. This is the total # of times someone changed cells w/o 
 #entering/leaving the jail
-locChanges <- anti_join(cLocs, activeDays, by = c("id", "terminus"))
-cell_changes[cell_changes$Category == "Overall", ]$LocChanges <- 
+locChanges <- anti_join(bLocs, activeDays, by = c("id", "terminus"))
+block_changes[block_changes$Category == "Overall", ]$LocChanges <- 
   nrow(locChanges)
 
-#Calculate the average active population size
-sizes <- c()
-for (i in seq_len(nrow(dates))) {
-  currentSize <- network.size.active(cDynNW, at = dates$DayNum[i])
-  sizes <- c(sizes, currentSize) 
-}
-avg_pop <- mean(sizes)
-cell_changes[cell_changes$Category == "Overall", ]$AveragePop <- avg_pop
-remove (currentSize, i)
+#Find the average active population size
+block_changes[block_changes$Category == "Overall", ]$AveragePop <- avg_pop
 
 #BY ATTRIBUTE
 locChanges <- merge(locChanges, ids[ , c("id", "Race", "InitialAge")], 
@@ -49,40 +55,40 @@ locChanges_age <- locChanges %>% group_by(InitialAge) %>%
 locChanges_floor <- locChanges %>% group_by(Floor) %>% 
   summarize(locChanges = n())
 for (i in seq_along(allRaces)) {
-  cell_changes[cell_changes$Category == allRaces[i], ]$LocChanges <- 
+  block_changes[block_changes$Category == allRaces[i], ]$LocChanges <- 
     locChanges_race[locChanges_race$Race == allRaces[i], ]$locChanges
-  cell_changes[cell_changes$Category == allRaces[i], ]$AveragePop <- 
-    mean(colSums(cDegDists_race[cDegDists_race$race == 
+  block_changes[block_changes$Category == allRaces[i], ]$AveragePop <- 
+    mean(colSums(bDegDists_race[bDegDists_race$race == 
                                            allRaces[i],-c(1,2)], na.rm = TRUE))
 }
 for (i in seq_along(allAges)) {
-  cell_changes[cell_changes$Category == 
+  block_changes[block_changes$Category == 
                  paste("Age", allAges[i], sep=" "), ]$LocChanges <- 
     locChanges_age[locChanges_age$InitialAge == allAges[i], ]$locChanges
-  cell_changes[cell_changes$Category == 
+  block_changes[block_changes$Category == 
                  paste("Age", allAges[i], sep=" "), ]$AveragePop <- 
-    mean(colSums(cDegDists_age[cDegDists_age$age == 
+    mean(colSums(bDegDists_age[bDegDists_age$age == 
                                            allAges[i],-c(1,2)], na.rm = TRUE))
 }
 for (i in seq_along(allFloors)) {
-  cell_changes[cell_changes$Category == 
+  block_changes[block_changes$Category == 
                  paste("Floor", allFloors[i], sep=" "), ]$LocChanges <- 
     locChanges_floor[locChanges_floor$Floor == allFloors[i], ]$locChanges
-  cell_changes[cell_changes$Category == 
+  block_changes[block_changes$Category == 
                  paste("Floor", allFloors[i], sep=" "), ]$AveragePop <- 
-    mean(colSums(cDegDists_floor[cDegDists_floor$floor == 
+    mean(colSums(bDegDists_floor[bDegDists_floor$floor == 
                                            allFloors[i],-c(1,2)], na.rm = TRUE))
 }
 remove(locChanges_age, locChanges_floor, locChanges_race)
 
 #Calculate turnover rates and print
-cell_changes$CellChangeRate <- (cell_changes$LocChanges / 
-                                cell_changes$AveragePop) / max(dates$DayNum) 
-print(cell_changes[ ,c("Category", "CellChangeRate")])
+block_changes$BlockChangeRate <- (block_changes$LocChanges / 
+                                block_changes$AveragePop) / max(dates$DayNum) 
+print(block_changes[ ,c("Category", "BlockChangeRate")])
 
-#Another approach to estimating avg. duration in a particular location...
+#Another approach to estimating avg. duration in a particular block...
 if (EstimateLocDurations == TRUE) {
-  locDurations <- cLocs
+  locDurations <- bLocs
   locDurations$startCensored <- "N"
   locDurations$startCensored[locDurations$onset == -Inf ] <- "Y"
   locDurations$endCensored <- "N"
@@ -122,12 +128,12 @@ if (EstimateLocDurations == TRUE) {
   locDurations4$InitialAge <- paste("Age", locDurations4$InitialAge)
   names(locDurations4)[names(locDurations4) == 'InitialAge'] <- 'category'
   
-  cLocDurations <- rbind(locDurations1, locDurations2, locDurations3, 
+  bLocDurations <- rbind(locDurations1, locDurations2, locDurations3, 
                         locDurations4)
-  cLocDurations <- cLocDurations[with(cLocDurations, order(category)), ]
-  cLocDurations <- cLocDurations %>% group_by(category) %>%
+  bLocDurations <- bLocDurations[with(bLocDurations, order(category)), ]
+  bLocDurations <- bLocDurations %>% group_by(category) %>%
     mutate(percentSpells = numSpells / sum(numSpells)) 
-  print.data.frame(cLocDurations[cLocDurations$category == "Overall", ])
+  print.data.frame(bLocDurations[bLocDurations$category == "Overall", ])
   
   remove(locDurations1, locDurations2, locDurations3, locDurations4)
 }
