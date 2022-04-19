@@ -1,0 +1,58 @@
+---
+title: "Step11-BlockLevelNWSetup"
+author: "Karina Wallrafen-Sam"
+date: "4/14/2022"
+output: html_document
+---
+
+```{r}
+#Adjust data frame of edges
+bEdges <- transform(bEdges, onset = as.numeric(firstTime))
+bEdges <- within(bEdges, onset[startCensored == 'Y'] <- -Inf)
+bEdges <- within(bEdges, lastTime[endCensored == 'Y'] <- Inf)
+bEdges$terminus <- bEdges$lastTime + 1
+bEdges$firstTime <- NULL
+bEdges$lastTime <- NULL
+
+#Create dynamic network object
+if (firstDay == as.Date("2021-10-27") & lastDay == as.Date("2022-02-04")) {
+  #Load in previously created dynamic network object
+  load("../bDynNW.Rds")
+
+  #Set vertex attributes
+  bDynNW <- set.vertex.attribute(bDynNW, "Race", ids$Race)
+  bDynNW <- set.vertex.attribute(bDynNW, "Age", ids$InitialAge)
+  bDynNW <- set.vertex.attribute(bDynNW, "Gender", ids$Gender)
+
+  #Activate vertices
+  bDynNW <- activate.vertices(x = bDynNW, onset = activeDays$onset,
+                              terminus = activeDays$terminus,
+                              v = activeDays$id)
+} else {
+  #Create a series of static networks
+  bNWs <- list()
+  for (i in seq_len(nrow(dates))){
+    currEdges <- bEdges[bEdges$onset <= dates$DayNum[i] &
+                          bEdges$terminus > dates$DayNum[i], ]
+    currNodes <- activeDays[activeDays$onset <= dates$DayNum[i] &
+                                    activeDays$terminus > dates$DayNum[i], ]
+    currNodes <- merge(currNodes,
+                       ids[, c("id", "Race", "InitialAge", "Gender")],
+                       by = "id")
+    currFloors <- m_stdLoc[m_stdLoc$Date == dates$Date[i], c("SoNum", "Floor")]
+    currFloors <- merge(currFloors, ids[, c("SoNum", "id")], by = "SoNum")
+    currNodes <- merge(currNodes, currFloors[, c("Floor", "id")], by = "id")
+
+    bNW <- network(currEdges[ , c("head", "tail")],
+               directed = FALSE, vertices = data.frame(name = currNodes$id))
+
+    bNW <- set.vertex.attribute(bNW, "Race", currNodes$Race)
+    bNW <- set.vertex.attribute(bNW, "Age", currNodes$InitialAge)
+    bNW <- set.vertex.attribute(bNW, "Gender", currNodes$Gender)
+    bNW <- set.vertex.attribute(bNW, "Floor", currNodes$Floor)
+    
+    bNWs[[length(bNWs) + 1]] <- bNW
+  }
+  remove(currNodes, currEdges, currFloors, bNW, i)
+}
+```

@@ -1,13 +1,11 @@
 ---
-title: "Step11-BlockLevelNWSetup"
+title: "Step2-BlockEdgeList"
 author: "Karina Wallrafen-Sam"
-date: "4/14/2022"
+date: "4/15/2022"
 output: html_document
 ---
 
 ```{r}
-#Create edge list for block-level edges
-
 #Merge in ids; combine floor, tower, and block into one column
 bDailyLoc <- merge(m_stdLoc, ids, by = "SoNum")[, c("id", "Date", "Floor",
                                                     "Tower", "Block")]
@@ -43,31 +41,4 @@ bEdges$endCensored <- "N"
 bEdges$endCensored[bEdges$lastTime == max(bEdges$lastTime) ] <- "Y"
 
 remove(bPairs, ind)
-
-#Adjust data frame of edges
-bEdges <- transform(bEdges, onset = as.numeric(firstTime))
-bEdges <- within(bEdges, onset[startCensored == 'Y'] <- -Inf)
-bEdges <- within(bEdges, lastTime[endCensored == 'Y'] <- Inf)
-bEdges$terminus <- bEdges$lastTime + 1
-bEdges$firstTime <- NULL
-bEdges$lastTime <- NULL
-
-#Create dynamic network object
-if (firstDay == as.Date("2021-10-27") & lastDay == as.Date("2022-02-04")) {
-  #Load in previously created dynamic network object
-  load("../bDynNW.Rds")
-
-  #Set vertex attributes
-  bDynNW <- set.vertex.attribute(bDynNW, "Race", ids$Race)
-  bDynNW <- set.vertex.attribute(bDynNW, "Age", ids$InitialAge)
-  bDynNW <- set.vertex.attribute(bDynNW, "Gender", ids$Gender)
-
-  #Activate vertices
-  bDynNW <- activate.vertices(x = bDynNW, onset = activeDays$onset,
-                              terminus = activeDays$terminus,
-                              v = activeDays$id)
-} else {
-  warning("Block-level dynamic network object not available for this timeframe")
-}
-
 ```

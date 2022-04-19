@@ -5,7 +5,7 @@ date: "4/1/2022"
 output: html_document
 ---
 
-```{r}
+```{r, include = FALSE}
 library(readxl)
 library(tidyr)
 library(dplyr)
@@ -103,5 +103,66 @@ contacts <- contacts %>% group_by(Date, Floor, Tower, Block, Cell) %>%
   mutate(CellContacts = n_distinct(SoNum)) %>% ungroup()
 contacts$BlockContacts <- contacts$BlockContacts - 1
 contacts$CellContacts <- contacts$CellContacts - 1
+```
+
+```{r}
+#Demographic breakdown - Overall
+ids2 <- ids
+ids2$InitialAge <- cut(ids2$InitialAge, breaks=c(0, 20, 30, 40, 50, 60, 100), 
+                       right = FALSE, labels = c("Under 20", "20 - 29", 
+                                                 "30 - 39", "40 - 49", 
+                                                 "50 - 59", "60+"))
+ids2[ids2$Race != "White" & ids2$Race != "Black", ]$Race <- "Other"
+ids2 <- rename(ids2,c('Age'='InitialAge'))
+
+# knitr::kable(table(ids2$Gender), 
+#              caption = "Total # of Residents by Gender", 
+#              col.names = c("Gender", "Freq"))
+# knitr::kable(table(ids2$Race), 
+#              caption = "Total # of Residents by Race",
+#              col.names = c("Race", "Freq"))
+# knitr::kable(table(ids2$Age), 
+#              caption = "Total # of Residents by Age",
+#              col.names = c("Age Group", "Freq"))
+
+#Demographic breakdown - First Day
+ids3 <- ids2[ids2$FirstDate == firstDay, ]
+ids3 <- merge(ids3, m_stdLoc[m_stdLoc$Date == firstDay, c("SoNum", "Floor")], 
+              by = "SoNum")
+knitr::kable(table(ids3$Gender), 
+             caption = "Initial # of Residents by Gender", 
+             col.names = c("Gender", "Freq"))
+knitr::kable(table(ids3$Race),
+             caption = "Initial # of Residents by Race",
+             col.names = c("Race", "Freq"))
+knitr::kable(table(ids3$Age),
+             caption = "Initial # of Residents by Age",
+             col.names = c("Age Group", "Freq"))
+knitr::kable(table(ids3$Floor),
+             caption = "Initial # of Residents by Floor",
+             col.names = c("Floor", "Freq"))
+# knitr::kable((ids3 %>% count(Floor, Gender, Race, Age)), 
+#              caption = "Initial # of Residents by Floor, Gender, Race, and Age")
+
+#Demographic breakdown - Last Day
+ids4 <- ids2[ids2$LastDate == lastDay, ]
+ids4 <- merge(ids4, m_stdLoc[m_stdLoc$Date == lastDay, c("SoNum", "Floor")], 
+              by = "SoNum")
+knitr::kable(table(ids4$Gender), 
+             caption = "Final # of Residents by Gender",
+             col.names = c("Gender", "Freq"))
+knitr::kable(table(ids4$Race),
+             caption = "Final # of Residents by Race",
+             col.names = c("Race", "Freq"))
+knitr::kable(table(ids4$Age),
+             caption = "Final # of Residents by Age",
+             col.names = c("Age Group", "Freq"))
+knitr::kable(table(ids4$Floor),
+             caption = "Final # of Residents by Floor",
+             col.names = c("Floor", "Freq"))
+# knitr::kable((ids4 %>% count(Floor, Gender, Race, Age)), 
+#              caption = "Final # of Residents by Floor, Gender, Race, and Age")
+
+remove(ids2, ids3, ids4)
 ```
 

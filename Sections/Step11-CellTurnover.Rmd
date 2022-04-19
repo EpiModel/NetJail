@@ -12,7 +12,10 @@ allAges <- unique(cDegDists_age[["age"]])
 rows <- c("Overall", paste("Floor", allFloors, sep=" "), allRaces, 
           paste("Age", allAges, sep=" "))
 cell_changes <- data.frame(Category = rows, LocChanges=NA, AveragePop=NA, 
-                           CellChangeRate = NA)
+                           CellChangeRate = NA, ChangesWInFloor = NA, 
+                           ChangesWInFloorTower = NA, ChangesWInBlock = NA,
+                           PercentWInFloor = NA, PercentWInFloorTower = NA,
+                           PercentWInBlock = NA)
 
 #OVERALL
 #Count up the total # of times a location spell ended w/o a corresponding active 
@@ -48,29 +51,30 @@ locChanges_age <- locChanges %>% group_by(InitialAge) %>%
   summarize(locChanges = n())
 locChanges_floor <- locChanges %>% group_by(Floor) %>% 
   summarize(locChanges = n())
+
 for (i in seq_along(allRaces)) {
-  cell_changes[cell_changes$Category == allRaces[i], ]$LocChanges <- 
+  cell_changes[cell_changes$Category == allRaces[i], ]$LocChanges <-
     locChanges_race[locChanges_race$Race == allRaces[i], ]$locChanges
-  cell_changes[cell_changes$Category == allRaces[i], ]$AveragePop <- 
-    mean(colSums(cDegDists_race[cDegDists_race$race == 
+  cell_changes[cell_changes$Category == allRaces[i], ]$AveragePop <-
+    mean(colSums(cDegDists_race[cDegDists_race$race ==
                                            allRaces[i],-c(1,2)], na.rm = TRUE))
 }
 for (i in seq_along(allAges)) {
-  cell_changes[cell_changes$Category == 
-                 paste("Age", allAges[i], sep=" "), ]$LocChanges <- 
+  cell_changes[cell_changes$Category ==
+                 paste("Age", allAges[i], sep=" "), ]$LocChanges <-
     locChanges_age[locChanges_age$InitialAge == allAges[i], ]$locChanges
-  cell_changes[cell_changes$Category == 
-                 paste("Age", allAges[i], sep=" "), ]$AveragePop <- 
-    mean(colSums(cDegDists_age[cDegDists_age$age == 
+  cell_changes[cell_changes$Category ==
+                 paste("Age", allAges[i], sep=" "), ]$AveragePop <-
+    mean(colSums(cDegDists_age[cDegDists_age$age ==
                                            allAges[i],-c(1,2)], na.rm = TRUE))
 }
 for (i in seq_along(allFloors)) {
-  cell_changes[cell_changes$Category == 
-                 paste("Floor", allFloors[i], sep=" "), ]$LocChanges <- 
+  cell_changes[cell_changes$Category ==
+                 paste("Floor", allFloors[i], sep=" "), ]$LocChanges <-
     locChanges_floor[locChanges_floor$Floor == allFloors[i], ]$locChanges
-  cell_changes[cell_changes$Category == 
-                 paste("Floor", allFloors[i], sep=" "), ]$AveragePop <- 
-    mean(colSums(cDegDists_floor[cDegDists_floor$floor == 
+  cell_changes[cell_changes$Category ==
+                 paste("Floor", allFloors[i], sep=" "), ]$AveragePop <-
+    mean(colSums(cDegDists_floor[cDegDists_floor$floor ==
                                            allFloors[i],-c(1,2)], na.rm = TRUE))
 }
 remove(locChanges_age, locChanges_floor, locChanges_race)
@@ -78,7 +82,81 @@ remove(locChanges_age, locChanges_floor, locChanges_race)
 #Calculate turnover rates and print
 cell_changes$CellChangeRate <- (cell_changes$LocChanges / 
                                 cell_changes$AveragePop) / max(dates$DayNum) 
-print(cell_changes[ ,c("Category", "CellChangeRate")])
+
+#Break down cell changes by changes to a new cell vs. block vs. tower/floor
+cLocs2 <- cLocs;
+cLocs2$nextLoc <- c(cLocs2$loc[-1], NA)
+locChanges2 <- anti_join(cLocs2, activeDays, by = c("id", "terminus"))
+locChanges2 <- merge(locChanges2, locChanges, 
+                     by = c("id", "loc", "onset", "terminus"))
+remove(cLocs2)
+
+#OVERALL
+#Count number of cell changes that stayed within the same floor
+sameFloor <- sum(substr(locChanges2$loc, 1, 1) == 
+                   substr(locChanges2$nextLoc, 1, 1))
+cell_changes[cell_changes$Category == "Overall", ]$ChangesWInFloor <- 
+  sameFloor
+
+#Count number of cell changes that stayed within the same tower + floor
+sameFloorTower <- sum(substr(locChanges2$loc, 1, 3) == 
+                   substr(locChanges2$nextLoc, 1, 3))
+cell_changes[cell_changes$Category == "Overall", ]$ChangesWInFloorTower <- 
+  sameFloorTower
+
+#Count number of cell changes that stayed within the same block
+sameBlock <- sum(substr(locChanges2$loc, 1, 5) == 
+                   substr(locChanges2$nextLoc, 1, 5))
+cell_changes[cell_changes$Category == "Overall", ]$ChangesWInBlock <- 
+  sameBlock
+
+#BY ATTRIBUTE
+cellChangeTypes_race <- locChanges2 %>% group_by(Race) %>% 
+  summarise(sameFloor = sum(substr(loc, 1, 1) == substr(nextLoc, 1, 1)), 
+            sameFloorTower = sum(substr(loc, 1, 3) == substr(nextLoc, 1, 3)),
+            sameBlock = sum(substr(loc, 1, 5) == substr(nextLoc, 1, 5)))
+
+cellChangeTypes_age <- locChanges2 %>% group_by(InitialAge) %>% 
+  summarise(sameFloor = sum(substr(loc, 1, 1) == substr(nextLoc, 1, 1)), 
+            sameFloorTower = sum(substr(loc, 1, 3) == substr(nextLoc, 1, 3)),
+            sameBlock = sum(substr(loc, 1, 5) == substr(nextLoc, 1, 5)))
+
+cellChangeTypes_floor <- locChanges2 %>% group_by(Floor) %>% 
+  summarise(sameFloor = sum(substr(loc, 1, 1) == substr(nextLoc, 1, 1)), 
+            sameFloorTower = sum(substr(loc, 1, 3) == substr(nextLoc, 1, 3)),
+            sameBlock = sum(substr(loc, 1, 5) == substr(nextLoc, 1, 5)))
+
+cellChangeTypes_floor <- rename(cellChangeTypes_floor,c('Category'='Floor'))
+
+temp <- rbind(cellChangeTypes_floor, 
+              setNames(cellChangeTypes_race, names(cellChangeTypes_floor)), 
+              setNames(cellChangeTypes_age, names(cellChangeTypes_floor)))
+
+cell_changes[2:17, 5:7] <- temp[, 2:4]
+
+remove(cellChangeTypes_floor, cellChangeTypes_age, cellChangeTypes_race, 
+       sameBlock, sameFloor, sameFloorTower, temp)
+
+#Calculate percentages and print
+cell_changes$PercentWInFloor <- 
+  round(as.numeric(cell_changes$ChangesWInFloor) / 
+          as.numeric(cell_changes$LocChanges) * 100, 2)
+cell_changes$PercentWInFloorTower <- 
+  round(as.numeric(cell_changes$ChangesWInFloorTower) / 
+          as.numeric(cell_changes$LocChanges) * 100, 2)
+cell_changes$PercentWInBlock <- 
+  round(as.numeric(cell_changes$ChangesWInBlock) / 
+          as.numeric(cell_changes$LocChanges) * 100, 2)
+knitr::kable(cell_changes[ ,c("Category", "CellChangeRate", "PercentWInFloor", 
+                              "PercentWInBlock")])
+
+#Floor change matrix
+locChanges2$nextFloor <- substr(locChanges2$nextLoc, 1, 2)
+cellChangesByFloor <- locChanges2 %>% group_by(Floor, nextFloor) %>% 
+  summarise(numChanges = n())
+cellChangesByFloor.mat <- cellChangesByFloor %>% 
+  pivot_wider(names_from = nextFloor, values_from = numChanges)
+knitr::kable(cellChangesByFloor.mat)
 
 #Another approach to estimating avg. duration in a particular location...
 if (EstimateLocDurations == TRUE) {
@@ -127,7 +205,7 @@ if (EstimateLocDurations == TRUE) {
   cLocDurations <- cLocDurations[with(cLocDurations, order(category)), ]
   cLocDurations <- cLocDurations %>% group_by(category) %>%
     mutate(percentSpells = numSpells / sum(numSpells)) 
-  print.data.frame(cLocDurations[cLocDurations$category == "Overall", ])
+  print(knitr::kable(cLocDurations[cLocDurations$category == "Overall", ]))
   
   remove(locDurations1, locDurations2, locDurations3, locDurations4)
 }

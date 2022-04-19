@@ -15,9 +15,9 @@ lastDay <- as.Date("2022-02-04")
 
 days <- c(1, 2, 5, 11, 17, 25) #Day indices for degree dist plots -- ideally 6
 
-EstimateLocDurations <- TRUE
-EstimateDurations <- TRUE
-AnalyseShortVsLong <- TRUE
+EstimateLocDurations <- TRUE #If T, calculate avg time spent in a block/cell
+EstimateDurations <- TRUE #If T, calculate avg time spent in jail
+AnalyseShortVsLong <- TRUE #If T, consider short vs long-term residents
 ```
 
 ```{r, results = 'asis', echo = FALSE}
@@ -36,7 +36,7 @@ For now, we subset out all data rows that contain female residents and/or locati
 
 At the end of this step, we have two data frames that we will use going forward: `m_stdLoc` and `ids`. `ids` lists out all the residents who ever appear in `m_stdLoc` and assigns them each an `id` (starting with 1). There's a one-to-one mapping from SO Number to `id`, making them interchangeable, but we will use `id` from now on for simplicity. 
 
-```{r, child = 'Sections/Step0-InitialProcessing.Rmd', include = FALSE}
+```{r, child = 'Sections/Step0-InitialProcessing.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
 
 ## Step 1: Create an edge list of cell-level edges
@@ -47,12 +47,19 @@ In order to list out all cell-level edges, we start by merging `cDailyLoc` (whic
 
 Once we have this counter, creating the cell-level edge list is straightforward: we group on the counter and list out the id for the head, the id for the tail, the day number on which the edge is first present, and the day number on which the edge is last present. We also note if edges are left-censored and/or right-censored. This information is stored in `cEdges`. 
 
-```{r, child = 'Sections/Step1-EdgeList.Rmd', include = FALSE}
+```{r, child = 'Sections/Step1-CellEdgeList.Rmd', include = FALSE}
 ```
 
-## Step 2: Identify when nodes are active and in known locations
+## Step 2: Create an edge list of block-level edges
 
-We create one data frame, `cLocs`, that lists out timeframes when we know (or believe) a particular person was in a particular location, and another, `activeDays`, that lists out timeframes when we know (or believe) a particular person was in the jail (in a standard location) at all. Our general approach is that if something is the same in two consecutive rosters, then we assume it was also the same in the time between the two rosters.
+To create the edge list of block-level edges, we use the same approach we used for the cell-level network in Step 1. We store the block-level edge list in `bEdges`.
+
+```{r, child = 'Sections/Step2-BlockEdgeList.Rmd', include = FALSE}
+```
+
+## Step 3: Identify when nodes are active and known to be in a particular cell
+
+We create one data frame, `cLocs`, that lists out timeframes when we know (or believe) a particular person was in a particular cell, and another, `activeDays`, that lists out timeframes when we know (or believe) a particular person was in the jail (in a standard location) at all. Our general approach is that if something is the same in two consecutive rosters, then we assume it was also the same in the time between the two rosters.
 
 For example, say that we are looking at the original full dataset (from 10/27 to 02/04) and that Person A is in Cell 1 in Roster 1 (on 10/27, or Day 1) and is still in Cell 1 in Roster 2 (on 12/01, or Day 36). Then we assume Person A was (a) 'active' (i.e., in the jail) and (b) located in Cell 1 the whole time between Day 1 and Day 36, too. If Person A is in Cell 1 in Roster 1 (on 10/27, or Day 1) and is in Cell 2 in Roster 2 (on 12/01, or Day 36), then we assume that Person A was also 'active' on Days 2 - 35 but we do not assume anything about their particular location in the jail during that time.
 
@@ -60,65 +67,113 @@ For a real example, consider SO Number P00069424 (node 10). This person is in Ro
 
 We thus consider them 'active' until Day 36 (inclusive) and from Day 87 on. We consider them to be 'in' 3N518 until Day 36 (inclusive), 'in' 2S200 on Day 87 only, 'in' 2S210 on Day 92 only, 'in' 4N200 on Day 97 only, and 'in' 4N212 on Day 101 only. This means that on Day 90, for example, node 10 is active but does not have an active location. 
 
-```{r, child = 'Sections/Step2-ActiveSpells.Rmd', include = FALSE}
+```{r, child = 'Sections/Step3-ActiveSpells.Rmd', include = FALSE}
 ```
 
-## Step 3: Create a dynamic network object for cell-level network
+## Step 4: Identify when nodes are known to be in a particular block
+
+We use the same approach that we used in Step 3 to create `bLocs`, which lists out timeframes when we know (or believe) a particular person was in a particular block. Again, we take the general approach of assuming that if something is the same in two consecutive rosters, then we assume it was also the same in the time between the two rosters.
+
+```{r, child = 'Sections/Step4-BlockSpells.Rmd', include = FALSE}
+```
+
+## Step 5: Create a dynamic network object for cell-level network
 
 In order to create a `networkDynamic` object for the cell-level network, we first need to manipulate `cEdges` a bit. We replace the column `lastTime` (the last day on which the edge is present) with `terminus` (the day *after* last day on which the edge is present, which is the day on which the edge should dissolve) and change the column name `startTime` to `onset` for consistency (it's the same column, though). We also change the `onset` value to `-Inf` for left-censored edges and the `terminus` value to `Inf` for right-censored edges (although this is probably unnecessary).
 
 We then need to create a static network that's the same size as the dynamic network we're going to create. This is very annoying because it makes the code much slower for some reason, but it seems to be the only way to specify that our network is not directed, which is important. 
 
-Then we're ready to create our cell-level `networkDynamic` object. We use the `cLocs` data frame we created in Step 2 to create a dynamic (TEA) node attribute called `location`. We also set age, race, and gender as (static) vertex attributes. (Each person's age is calculated as of the first day that they appear in the data. Some of the residents may have a birthday during the time period we're considering, but we ignore that.) Finally, we activate nodes based on the data in `activeDays`. 
+Then we're ready to create our cell-level `networkDynamic` object. We use the `cLocs` data frame we created in Step 3 to create a dynamic (TEA) node attribute called `location`. We also set age, race, and gender as (static) vertex attributes. (Each person's age is calculated as of the first day that they appear in the data. Some of the residents may have a birthday during the time period we're considering, but we ignore that.) Finally, we activate nodes based on the data in `activeDays`. 
 
-```{r, child = 'Sections/Step3-DynNWObject.Rmd', include = FALSE}
+```{r, child = 'Sections/Step5-cDynNWObject.Rmd', include = FALSE}
 ```
 
-## Step 4: Calculate overall degree distribution for cell-level network
+## Step 6: Load a dynamic network object for block-level network
+
+We start by making the same changes to `bEdges` that we made to `cEdges` in Step 5. 
+
+Because the block-level network is huge, it is impractical to create a block-level `networkDynamic` object here, so instead, we either load in a previously created object or create a series of static `network` objects.
+
+Currently, a block-level `networkDynamic` object (`bDynNW`) is only available for the 10/27 - 02/04 time frame. If that is the specified time frame of interest, we load in `bDynNW`, then set age, race, and gender as (static) vertex attributes and activate nodes based on `activeDays` as we did in Step 5 for the cell-level network. (Note that `bDynNW` has a dynamic (TEA) node attribute called `location` crated from `cLocs` (NOT `bLocs`) that tells us what cell (NOT block) the node is in when known/assumed.)
+
+If any other time frame has been specified, then we take the approach of creating a static `network` object for each time point for which we have a roster (using only the nodes and edges that are active at that time point). The nodes in these static networks have 4 attributes: age, race, gender, and floor.   
+
+```{r, child = 'Sections/Step6-bDynNWObject.Rmd', include = FALSE}
+```
+
+## Step 7: Calculate overall degree distribution for cell-level network
 
 To calculate the cell-level degree distribution over time, we extract the cell-level network at each time point for which we have a roster and use the `degreedist()` function on the extracted networks. We plot the degree distribution at a few selected time points. We also calculate the mean degree at each time point for which we have a roster and display these values in both a box plot and a scatter plot. In the box plot, each 'box' spans from the mean minus one standard deviation to the mean plus one standard deviation at that time point (with the lines spanning from minimum to maximum at each time point). Since the degree distributions are so right-skewed, the mean minus one standard deviation is often less than 0 (although of course no node has a degree less than 0).
 
 `cOverallMeanDeg` is a simple, un-weighted average of these mean degree values (each day is weighted equally, without regard for changing network size.) This represents how many cell-level edges the average resident has on the average day. 
 
-```{r, child = 'Sections/Step4-DegreeDist.Rmd', echo = FALSE, message = FALSE, warning = FALSE}
+```{r, child = 'Sections/Step7-CellDegreeDist.Rmd', echo = FALSE, message = FALSE, warning = FALSE}
 ```
 
-## Step 5: Calculate degree distribution by attribute for cell-level network
+## Step 8: Calculate degree distribution by attribute for cell-level network
 
-In Step 5, we perform the same operations as in Step 4, but broken down by race (a fixed attribute), age (which we are treating as a fixed attribute), and floor (a time-varying attribute, which we extract at each time point for which we have a roster). We break age into 10-year age categories and divide race into Black, White, and Other.
+In Step 8, we perform the same operations as in Step 7, but broken down by race (a fixed attribute), age (which we are treating as a fixed attribute), and floor (a time-varying attribute, which we extract at each time point for which we have a roster). We break age into 10-year age categories and divide race into Black, White, and Other.
 
-```{r, child = 'Sections/Step5-DegreeDistByAttr.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```{r, child = 'Sections/Step8-CellDegreeDistByAttr.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
 
-## Step 6: Estimate rate of cell changes within jail
+## Step 9: Calculate overall degree distribution for block-level network
+
+To calculate the block-level degree distribution over time, we adapt the same approach that we used in Step 7 when we calculated the cell-level degree distribution. 
+
+`bOverallMeanDeg` is analogous to `cOverallMeanDeg`: a simple, un-weighted average of the (block-level) mean degree at each time point. It represents how many block-level edges the average resident has on the average day. 
+
+```{r, child = 'Sections/Step9-BlockDegreeDist.Rmd', echo = FALSE, message = FALSE, warning = FALSE}
+```
+
+## Step 10: Calculate degree distribution by attribute for block-level network
+
+In Step 10, we perform the same operations as in Step 9, but broken down by race, age, and floor. As in Step 8, we break age into 10-year age categories and divide race into Black, White, and Other.
+
+```{r, child = 'Sections/Step10-BlockDegreeDistByAttr.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```
+
+## Step 11: Estimate rate of cell changes within jail
 
 We begin by counting up the number of times that a location spell (in `cLocs`) ends without its corresponding activity spells (in `activeDays`) also ending. This represents the total number of times we believe that someone left their cell (and moved to a new one) without leaving the jail. We divide this number by the average active population size and divide again by the number of days in our timeframe of interest for scaling purposes. This gives us an estimate of the number of cell changes per person per day. This approach is better suited to timeframes in which we have daily data, without gaps. 
 
-We also perform these same calculations broken down by race, age, and floor (i.e., the floor of the cell that is vacated). 
+Additionally, we count how many (and what percent of) cell changes were within the same floor vs. within the same floor and tower vs. within the same block. (The cell changes within the same block are a subset of the cell changes within the same floor and tower, which in turn are a subset of the cell changes within the same floor.)
+
+We also perform all of the above calculations broken down by race, age, and floor (i.e., the floor of the cell that is vacated). 
+
+Finally, we create a matrix showing how many cell changes were from Floor i to Floor j (for i,j = 1, 2, ..., 7). (In this matrix, the rows are for the cell that the person moved FROM and the columns are for the cell that the person moved TO.)
 
 Additionally, we can look at the average duration of the location spells in `cLocs`, broken down by censoring status (i.e., left-censored vs. right-censored vs. censored on both sides vs. not censored) and by attribute. This approach is better suited to longer timeframes. The column `percentSpells` indicates what percent of location spells for that particular attribute (e.g., Floor 7) have that censoring status. 
 
-_What percentage of location changes are to a new floor vs. a new block within the same floor vs. a new cell within the same block? Essentially need a probability matrix?_
 
-```{r, child = 'Sections/Step6-CellTurnover.Rmd', echo = FALSE, message = FALSE, warning = FALSE}
+```{r, child = 'Sections/Step11-CellTurnover.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
 
-## Step 7: Estimate Turnover Rates
+## Step 12: Estimate rate of block changes within jail
+
+We use the same approach that we used in Step 11 to now estimate the number of block changes per person per day. Again, this analysis is better suited to timeframes in which we have daily data, without gaps. We  perform these calculations overall and broken down by race, age, and floor (i.e., the floor of the block that is vacated). 
+
+Additionally, we can look at the average duration of the location spells in `bLocs`, broken down by censoring status (i.e., left-censored vs. right-censored vs. censored on both sides vs. not censored) and by attribute. Again, this approach is better suited to longer timeframes.  
+
+```{r, child = 'Sections/Step12-BlockTurnover.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```
+
+## Step 13: Estimate Turnover Rates
 
 In this section, we calculate turnover rates (into and out of the jail) overall and by attribute. We attempt to adapt the DOJ's definition of "weekly turnover rate" ("The sum of weekly admissions and releases divided by the average daily population") since we do not have consistent weekly data. Instead, we calculate the following:
 
-We add up the known admissions (i.e., the number of spells of activity, as defined in Step 2, that are not left-censored) and the known releases (i.e., the number of spells of activity, as defined in Step 2, that are not right-censored). These numbers include repeat admissions and releases. We calculate `TurnoverIn` by dividing the number of admissions by the average active network size (i.e., the average number of residents in the jail across the days for which we have data). Similarly, we calculate `TurnoverOut` by dividing the number of releases by the average active network size. Note that the numerators may be significantly underestimated if there are data gaps within the selected timeframe. For scaling purposes, we divide `TurnoverIn` and `TurnoverOut` by the number of days in our timeframe. These numbers represent, roughly, an (under)estimate of the number of daily admissions and releases, respectively, per resident. This approach is better suited to timeframes in which we have daily data, without gaps. 
+We add up the known admissions (i.e., the number of spells of activity, as defined in Step 3, that are not left-censored) and the known releases (i.e., the number of spells of activity, as defined in Step 3, that are not right-censored). These numbers include repeat admissions and releases. We calculate `TurnoverIn` by dividing the number of admissions by the average active network size (i.e., the average number of residents in the jail across the days for which we have data). Similarly, we calculate `TurnoverOut` by dividing the number of releases by the average active network size. Note that the numerators may be significantly underestimated if there are data gaps within the selected timeframe. For scaling purposes, we divide `TurnoverIn` and `TurnoverOut` by the number of days in our timeframe. These numbers represent, roughly, an (under)estimate of the number of daily admissions and releases, respectively, per resident. This approach is better suited to timeframes in which we have daily data, without gaps. 
 
 We perform the above calculations overall and broken down by age, race, and floor. The calculations by age and race are a matter of straightforward subsetting (since age and race are static attributes); the calculations by floor are a little more involved. (For every non-left-censored spell of activity (i.e., admission), we check what floor the resident was in on the first day in that spell. We consider this the floor that they were admitted to. Similarly, for every non-right-censored spell of activity (i.e., release), we check what floor the resident was in on the last day in that spell. We consider this the floor that they were released from. Then we can count up the admissions and releases by floor.)
 
 Additionally, we can also look at the average duration of an active spell and the average number of locations per active spell. This approach is better suited to longer timeframes. We break these statistics down by censoring status (looking at spells of activity that are neither right- nor left-censored vs. spells that are right-censored only vs. spells that are left-censored only vs. spells that are censored on both sides). By definition, the average duration for spells that are censored on both sides is the number of days in the selected timeframe. 
 
-Specifically, if we look at 10/27 to 02/04, then both-censored spells are 101 days long by definition, and uncensored spells must, by definition, have started on or after 12/01 and ended on or before 01/31, meaning that they can be at most 62 days long. These short-term uncensored spells are about 11 days long on average. Interestingly, there is no obvious relationship between censoring category and the average number of locations per spell, suggesting that short-term residents move locations within the jail more frequently. As in Step 6, the column `percentSpells` indicates what percent of activity spells for that particular attribute (e.g., Floor 7) have that censoring status. Looking at this column, we can see that both-censored spells of activity are more common on higher floors and among younger residents.
+Specifically, if we look at 10/27 to 02/04, then both-censored spells are 101 days long by definition, and uncensored spells must, by definition, have started on or after 12/01 and ended on or before 01/31, meaning that they can be at most 62 days long. These short-term uncensored spells are about 11 days long on average. Interestingly, there is no obvious relationship between censoring category and the average number of locations per spell, suggesting that short-term residents move locations within the jail more frequently. As in Step 11, the column `percentSpells` indicates what percent of activity spells for that particular attribute (e.g., Floor 7) have that censoring status. Looking at this column, we can see that both-censored spells of activity are more common on higher floors and among younger residents.
 
-```{r, child = 'Sections/Step7-JailTurnover.Rmd', echo = FALSE, message = FALSE, warning=FALSE}
+```{r, child = 'Sections/Step13-JailTurnover.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning=FALSE}
 ```
 
-## Step 8: Consider long- vs. short-term residents
+## Step 14: Consider long- vs. short-term residents
 
 This step is better suited to longer timeframes. 
 
@@ -126,21 +181,23 @@ We consider residents to be 'long-term' if they have a single spell of activity 
 
 We then list out the number and percentage of residents that are long-term vs. short-term, overall and broken down by attribute (race, age, and floor). (Note that while every resident has a single age and race, many are located on different floors at different times and are therefore counted multiple times across floor categories.)
 
-_Want the average time spent in a particular location for short-term vs. long-term residents, broken down by location spell censoring status. (e.g., among long-term residents, what percentage of location spells are uncensored, and how long are uncensored location spells on average, etc.)_
+Additionally, we can look at the average duration of the cell-level location spells in `cLocs` and the block-level location spells in `bLocs`, broken down by location-spell censoring status (left- vs. right- vs. both- and not-censored) and by resident type (long-term vs. short-term vs. neither).
 
-```{r, child = 'Sections/Step8-LongVsShortStays.Rmd', echo = FALSE, message = FALSE, warning=FALSE}
+_Also need to list out active spell locations_
+
+```{r, child = 'Sections/Step14-LongVsShortStays.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning=FALSE}
 ```
 
-## Step 9: Create animations of cell-level edges within a single block
+## Step 15: Create animations of cell-level edges within a single block
 
 In the animations below, blue nodes represent Black residents, green nodes represent white residents, and red nodes represent residents of another race. Larger nodes represent older residents. An edge between two nodes represents two residents being housed in the same cell. A given resident is represented in the animation at time points when they are known (or assumed) to have been in the specified block. 
 
 Again, we take the general approach of assuming that if something is the same in two consecutive rosters, then it was also the same in the time between the two rosters. If an edge is present in one roster and not in the next, then it is assumed to have dissolved immediately after the date of the first roster; similarly, if a resident is in the specified block in one roster but not in the next, then they are assumed to have left immediately after the date of the first roster. 
 
-```{r, child = 'Sections/Step9-Animations.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```{r, child = 'Sections/Step15-Animations.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
 
-## Step 10: Calculate and visualize age mixing matrix (for cell-level network)
+## Step 16: Calculate and visualize age mixing matrix (for cell-level network)
 
 To analyze the age mixing in our cell-level network, we begin by creating a data frame, `doubledEdges`, that contains every edge in `cEdges` twice: once with the node with the smaller `id` as the head, and once with it as the tail. We then merge in the age (broken into 10-year categories) of the head and the tail of each edge. 
 
@@ -148,34 +205,5 @@ We then analyze the age mixing on the first day and the last day of our timefram
 
 Finally, to see how the age mixing changed from the beginning to the end of our timeframe of interest, we subtract the initial age mixing matrix from the final one and present the result in a contour plot. We do this twice, once using numbers and once using proportions. 
 
-```{r, child = 'Sections/Step10-AgeMixing.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```{r, child = 'Sections/Step16-AgeMixing.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
-
-## Step 11: Create edge list and dynamic network object for block-level network
-
-To create the edge list of block-level edges, we use the same approach we used for the cell-level network in Step 1 (and Step 3). We store the block-level edge list in `bEdges`.
-
-Because the block-level network is huge, it is impractical to create a block-level `networkDynamic` object here, so we load in a previously created object instead. Currently, a block-level `networkDynamic` object (`bDynNW`) is only available for the 10/27 - 02/04 time frame, so if a different time frame has been specified, then degree distributions, etc. will not be calculated for the block-level network. (Like `cDynNW`, `bDynNW` has a dynamic (TEA) node attribute called `location` (crated from `cLocs`) that tells us what cell (NOT block) the node is in when known/assumed.)
-
-Once `bDynNW`  has been loaded, we set age, race, and gender as (static) vertex attributes and activate nodes based on `activeDays` as we did in Step 3 for the cell-level network.
-
-```{r, child = 'Sections/Step11-BlockLevelNWSetup.Rmd', include = FALSE}
-```
-
-## Step 12: Calculate overall degree distribution for block-level network
-
-To calculate the block-level degree distribution over time, we adapt the same approach that we used in Step 4 to calculate the cell-level degree distribution. 
-
-`bOverallMeanDeg` is analogous to `cOverallMeanDeg`: a simple, un-weighted average of the (block-level) mean degree at each time point. It represents how many block-level edges the average resident has on the average day. 
-
-```{r, child = 'Sections/Step12-BlockLevelDegreeDist.Rmd', echo = FALSE, message = FALSE, warning = FALSE}
-```
-
-## Step 13: Calculate degree distribution by attribute for block-level network
-
-In Step 13, we perform the same operations as in Step 12, but broken down by race, age, and floor. As in Step 5, we break age into 10-year age categories and divide race into Black, White, and Other.
-
-```{r, child = 'Sections/Step13-BlockDegreeDistByAttr.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
-```
-
-## Step 14: Estimate rate of block changes within jail

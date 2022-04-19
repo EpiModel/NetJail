@@ -6,26 +6,10 @@ output: html_document
 ---
 
 ```{r}
-#Create bLocs
-bLocs <- merge(bDailyLoc, dates, by = "Date")
-bLocs <- bLocs[with(bLocs, order(id, DayIndex)), ]
-ind <- which(bLocs$id==lag(bLocs$id) & bLocs$loc==lag(bLocs$loc) &
-               bLocs$DayIndex==(lag(bLocs$DayIndex) + 1))
-bLocs$newLoc <- "True"
-bLocs[ind, ]$newLoc <- "False"
-bLocs$locCounter <- cumsum(bLocs$newLoc == "True")
-bLocs$newLoc <- NULL
-remove(ind)
-bLocs <- bLocs %>% group_by(locCounter) %>%
-  summarise(id = first(id), loc = first(loc), onset = min(DayNum),
-            terminus = max(DayNum) + 1)
-bLocs$locCounter <- NULL
-bLocs$onset[bLocs$onset == min(bLocs$onset) ] <- -Inf
-bLocs$terminus[bLocs$terminus == max(bLocs$terminus) ] <- Inf
-bLocs <- transform(bLocs, id = as.numeric(id))
-
 block_changes <- data.frame(Category = rows, LocChanges=NA, AveragePop=NA, 
-                           BlockChangeRate = NA)
+                           BlockChangeRate = NA, ChangesWInFloor = NA, 
+                           ChangesWInFloorTower = NA, PercentWInFloor = NA, 
+                           PercentWInFloorTower = NA)
 
 #OVERALL
 #Count up the total # of times a location spell ended w/o a corresponding active 
@@ -84,7 +68,70 @@ remove(locChanges_age, locChanges_floor, locChanges_race)
 #Calculate turnover rates and print
 block_changes$BlockChangeRate <- (block_changes$LocChanges / 
                                 block_changes$AveragePop) / max(dates$DayNum) 
-print(block_changes[ ,c("Category", "BlockChangeRate")])
+#knitr::kable(block_changes[ ,c("Category", "BlockChangeRate")])
+
+#Break down block changes by changes to a new block vs. tower/floor
+bLocs2 <- bLocs;
+bLocs2$nextLoc <- c(bLocs2$loc[-1], NA)
+locChanges2 <- anti_join(bLocs2, activeDays, by = c("id", "terminus"))
+locChanges2 <- merge(locChanges2, locChanges, 
+                     by = c("id", "loc", "onset", "terminus"))
+remove(bLocs2)
+
+#OVERALL
+#Count number of block changes that stayed within the same floor
+sameFloor <- sum(substr(locChanges2$loc, 1, 1) == 
+                   substr(locChanges2$nextLoc, 1, 1))
+block_changes[block_changes$Category == "Overall", ]$ChangesWInFloor <- 
+  sameFloor
+
+#Count number of cell changes that stayed within the same tower + floor
+sameFloorTower <- sum(substr(locChanges2$loc, 1, 3) == 
+                   substr(locChanges2$nextLoc, 1, 3))
+block_changes[block_changes$Category == "Overall", ]$ChangesWInFloorTower <- 
+  sameFloorTower
+
+#BY ATTRIBUTE
+blockChangeTypes_race <- locChanges2 %>% group_by(Race) %>% 
+  summarise(sameFloor = sum(substr(loc, 1, 1) == substr(nextLoc, 1, 1)), 
+            sameFloorTower = sum(substr(loc, 1, 3) == substr(nextLoc, 1, 3)))
+
+blockChangeTypes_age <- locChanges2 %>% group_by(InitialAge) %>% 
+  summarise(sameFloor = sum(substr(loc, 1, 1) == substr(nextLoc, 1, 1)), 
+            sameFloorTower = sum(substr(loc, 1, 3) == substr(nextLoc, 1, 3)))
+
+blockChangeTypes_floor <- locChanges2 %>% group_by(Floor) %>% 
+  summarise(sameFloor = sum(substr(loc, 1, 1) == substr(nextLoc, 1, 1)), 
+            sameFloorTower = sum(substr(loc, 1, 3) == substr(nextLoc, 1, 3)))
+
+blockChangeTypes_floor <- rename(blockChangeTypes_floor,c('Category'='Floor'))
+
+temp <- rbind(blockChangeTypes_floor, 
+              setNames(blockChangeTypes_race, names(blockChangeTypes_floor)), 
+              setNames(blockChangeTypes_age, names(blockChangeTypes_floor)))
+
+block_changes[2:17, 5:6] <- temp[, 2:3]
+
+remove(blockChangeTypes_floor, blockChangeTypes_age, blockChangeTypes_race, 
+       sameFloor, sameFloorTower, temp)
+
+#Calculate percentages and print
+block_changes$PercentWInFloor <- 
+  round(as.numeric(block_changes$ChangesWInFloor) / 
+          as.numeric(block_changes$LocChanges) * 100, 2)
+block_changes$PercentWInFloorTower <- 
+  round(as.numeric(block_changes$ChangesWInFloorTower) / 
+          as.numeric(block_changes$LocChanges) * 100, 2)
+knitr::kable(block_changes[ ,c("Category", "BlockChangeRate", 
+                               "PercentWInFloor")])
+
+#Floor change matrix
+locChanges2$nextFloor <- substr(locChanges2$nextLoc, 1, 2)
+blockChangesByFloor <- locChanges2 %>% group_by(Floor, nextFloor) %>% 
+  summarise(numChanges = n())
+blockChangesByFloor.mat <- blockChangesByFloor %>% 
+  pivot_wider(names_from = nextFloor, values_from = numChanges)
+knitr::kable(blockChangesByFloor.mat)
 
 #Another approach to estimating avg. duration in a particular block...
 if (EstimateLocDurations == TRUE) {
@@ -133,7 +180,7 @@ if (EstimateLocDurations == TRUE) {
   bLocDurations <- bLocDurations[with(bLocDurations, order(category)), ]
   bLocDurations <- bLocDurations %>% group_by(category) %>%
     mutate(percentSpells = numSpells / sum(numSpells)) 
-  print.data.frame(bLocDurations[bLocDurations$category == "Overall", ])
+  print(knitr::kable(bLocDurations[bLocDurations$category == "Overall", ]))
   
   remove(locDurations1, locDurations2, locDurations3, locDurations4)
 }

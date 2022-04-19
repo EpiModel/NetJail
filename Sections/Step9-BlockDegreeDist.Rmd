@@ -6,20 +6,36 @@ output: html_document
 ---
 
 ```{r}
-#Overall degree distribution at each time point
-for (i in seq_len(nrow(dates))){
-  currentNW <- as.network(network.extract(bDynNW, at = dates$DayNum[i]))
-  dist <- degreedist(currentNW, print = FALSE)
-  dist <- data.frame(deg = as.integer(substr(names(dist), 7, 8)),
-                     num = as.integer(dist))
-  names(dist)[names(dist) == "num"] <- toString(dates$Date[i])
-  if (i == 1) {
-    bDegDists <- dist
-  } else {
-    bDegDists <- merge(bDegDists, dist, by = "deg", all = TRUE)
+if (exists("bDynNW")){
+  #Overall degree distribution at each time point
+  for (i in seq_len(nrow(dates))){
+    currentNW <- as.network(network.extract(bDynNW, at = dates$DayNum[i]))
+    dist <- degreedist(currentNW, print = FALSE)
+    dist <- data.frame(deg = as.integer(substr(names(dist), 7, 8)),
+                       num = as.integer(dist))
+    names(dist)[names(dist) == "num"] <- toString(dates$Date[i])
+    if (i == 1) {
+      bDegDists <- dist
+    } else {
+      bDegDists <- merge(bDegDists, dist, by = "deg", all = TRUE)
+    }
   }
+  remove(dist, i, currentNW)
+} else {
+  for (i in seq_len(nrow(dates))){
+    currentNW <- bNWs[[i]]
+    dist <- degreedist(currentNW, print = FALSE)
+    dist <- data.frame(deg = as.integer(substr(names(dist), 7, 8)),
+                       num = as.integer(dist))
+    names(dist)[names(dist) == "num"] <- toString(dates$Date[i])
+    if (i == 1) {
+      bDegDists <- dist
+    } else {
+      bDegDists <- merge(bDegDists, dist, by = "deg", all = TRUE)
+    }
+  }
+  remove(dist, i, currentNW)
 }
-remove(dist, i, currentNW)
 
 #Histograms:
 par(mfrow = c(3,2))
@@ -45,12 +61,14 @@ bMeanDeg$min <- as.numeric(lapply(bDegDists[ , -1], function(x)
 
 #Create box plot of mean degree
 par(mfrow = c(1,1))
-ggplot(bMeanDeg,aes(x=dates.Date)) + 
+g <- ggplot(bMeanDeg,aes(x=dates.Date)) + 
   geom_boxplot(aes(lower=(bMeanDeg-sd), upper=(bMeanDeg+sd), middle=bMeanDeg, 
                    ymin=min, ymax=max, group = dates.Date), 
                stat="identity") + 
   ggtitle("Block-level mean degree (with Std. Dev.) over time") +
   xlab("Date") + ylab("Block-Level Degree")
+print(g)
+remove(g)
 
 #Create scatterplot of mean degree
 par(mfrow = c(1,1))
@@ -63,5 +81,6 @@ bOverallMeanDeg <- mean(bMeanDeg$bMeanDeg)
 print(paste0("The block-level mean degree averaged across the days from ", 
              firstDay, " to ", lastDay, " is ", 
              round(bOverallMeanDeg, digits = 4), " edges per node."))
+
 ```
 

@@ -1,0 +1,25 @@
+---
+title: "Step4-BlockSpells"
+author: "Karina Wallrafen-Sam"
+date: "4/15/2022"
+output: html_document
+---
+
+```{r}
+bLocs <- merge(bDailyLoc, dates, by = "Date")
+bLocs <- bLocs[with(bLocs, order(id, DayIndex)), ]
+ind <- which(bLocs$id==lag(bLocs$id) & bLocs$loc==lag(bLocs$loc) &
+               bLocs$DayIndex==(lag(bLocs$DayIndex) + 1))
+bLocs$newLoc <- "True"
+bLocs[ind, ]$newLoc <- "False"
+bLocs$locCounter <- cumsum(bLocs$newLoc == "True")
+bLocs$newLoc <- NULL
+remove(ind)
+bLocs <- bLocs %>% group_by(locCounter) %>%
+  summarise(id = first(id), loc = first(loc), onset = min(DayNum),
+            terminus = max(DayNum) + 1)
+bLocs$locCounter <- NULL
+bLocs$onset[bLocs$onset == min(bLocs$onset) ] <- -Inf
+bLocs$terminus[bLocs$terminus == max(bLocs$terminus) ] <- Inf
+bLocs <- transform(bLocs, id = as.numeric(id))
+```

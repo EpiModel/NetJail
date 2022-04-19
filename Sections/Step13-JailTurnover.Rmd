@@ -102,13 +102,7 @@ turnover_rates$TurnoverIn <- (turnover_rates$Admissions /
                                 turnover_rates$AveragePop) / max(dates$DayNum) 
 turnover_rates$TurnoverOut <- (turnover_rates$Releases / 
                                 turnover_rates$AveragePop) / max(dates$DayNum) 
-print(turnover_rates[ ,c("Category", "TurnoverOut")])
-
-
-
-
-
-
+knitr::kable(turnover_rates[ ,c("Category", "TurnoverOut")])
 
 #Another approach to estimating avg. duration in network...
 if (EstimateDurations == TRUE) {
@@ -182,10 +176,10 @@ if (EstimateDurations == TRUE) {
     mutate(percentSpells = round(numSpells / sum(numSpells), 4) * 100) 
   durationsSummary$meanDur <- round(durationsSummary$meanDur, 2)
   durationsSummary$meanNumLocs <- round(durationsSummary$meanNumLocs, 2)
-  print.data.frame(durationsSummary[durationsSummary$category == "Overall",
+  print(knitr::kable(durationsSummary[durationsSummary$category == "Overall",
                                     c("startCensored", "endCensored", "category", 
                                       "meanDur", "meanNumLocs", 
-                                      "percentSpells")])
+                                      "percentSpells")]))
   
   remove(durations1, durations2, durations3, durations4)
 }
