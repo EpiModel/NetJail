@@ -105,7 +105,7 @@ cMeanDeg_floor <- cDegDists_floor2 %>% group_by(floor, Date) %>%
 cat('\n####', 'Mean Degree over Time by Floor', '\n')
 par(mfrow = c(2,2))
 floors <- 1:7
-max.y <- round(max(cMeanDeg_floor$MeanDeg), 1)
+max.y <- ceiling(max(cMeanDeg_floor$MeanDeg) * 10) / 10
 min.y <- floor(min(cMeanDeg_floor$MeanDeg) * 10) / 10
 for (i in seq_along(floors)) {
     plot(cMeanDeg_floor[cMeanDeg_floor$floor == floors[i], ]$Date, 
@@ -141,7 +141,7 @@ cMeanDeg_race <- cDegDists_race2 %>% group_by(race, Date) %>%
             max = max(degree))
 races <- c("Black", "White", "Other")
 cat('\n####', 'Mean Degree over Time by Race', '\n')
-max.y <- round(max(cMeanDeg_race$MeanDeg), 1)
+max.y <- ceiling(max(cMeanDeg_race$MeanDeg) * 10) / 10
 min.y <- floor(min(cMeanDeg_race$MeanDeg) * 10) / 10
 par(mfrow = c(2,2))
 for (i in seq_along(races)) {
@@ -178,7 +178,7 @@ cMeanDeg_age <- cDegDists_age2 %>% group_by(age, Date) %>%
             max = max(degree))
 ages <- c("Under 20", "20 - 29", "30 - 39", "40 - 49", "50 - 59", "60+")
 cat('\n####', 'Mean Degree over Time by Age Group', '\n')
-max.y <- round(max(cMeanDeg_age$MeanDeg), 1)
+max.y <- ceiling(max(cMeanDeg_age$MeanDeg) * 10) / 10
 min.y <- floor(min(cMeanDeg_age$MeanDeg) * 10) / 10
 par(mfrow = c(2,2))
 plot.new()

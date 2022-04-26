@@ -132,7 +132,7 @@ temp <- rbind(cellChangeTypes_floor,
               setNames(cellChangeTypes_race, names(cellChangeTypes_floor)), 
               setNames(cellChangeTypes_age, names(cellChangeTypes_floor)))
 
-cell_changes[2:17, 5:7] <- temp[, 2:4]
+cell_changes[2:nrow(cell_changes), 5:7] <- temp[, 2:4]
 
 remove(cellChangeTypes_floor, cellChangeTypes_age, cellChangeTypes_race, 
        sameBlock, sameFloor, sameFloorTower, temp)

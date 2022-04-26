@@ -28,15 +28,17 @@ cat('\n')
 
 ## Step 0: Load in data and conduct initial processing/cleaning
 
-We start by loading all excel files from the data/input/FJC folder into a single large data frame, `all_data`. Although some of the excel files include their data split into multiple sheets (one for each floor/tower), all of them start with the full roster in a single sheet, so we disregard the extra sheets.
+We start by loading all excel files from the data/input/FJC folder into a single large data frame, `all_data`. This folder currently contains rosters from 10/27/21 to 04/11/22. Although some of the excel files include their data split into multiple sheets (one for each floor/tower), all of them start with the full roster in a single sheet, so we disregard the extra sheets.
 
-When we check for the uniqueness of the SO Numbers (considering the original full dataset, from 10/27 to 02/04), we see that 6 SO Numbers are associated with multiple DOBs and 1 with multiple Races. For these SO Numbers, we consider the DOB/Race from the most recent roster to be the 'truth'. Also, SO Number P01007978 has Gender = “M” from 10/27/2021 to 01/31/2022 and Gender = “F” on 02/04/2022. Since this person is always located in parts of the jail that house male residents, we will consider Gender = "M" to be the 'truth'. We adjust the data accordingly for these 8 residents. We then remove any data that falls outside of our specified timeframe of interest.
+When we check for the uniqueness of the SO Numbers (considering all rosters from 10/27 to 04/11), we see that 11 SO Numbers are associated with multiple DOBs and 3 with multiple Races. For these SO Numbers, we consider the DOB/Race from the most recent roster to be the 'truth'. Also, SO Number P01007978 has Gender = “M” from 10/27/2021 to 01/31/2022 and Gender = “F” from 02/04/2022 to 04/11/22. Since this person is always located in parts of the jail that house male residents, we will consider Gender = "M" to be the 'truth'. We adjust the data accordingly for these 15 residents. We then remove any data that falls outside of our specified timeframe of interest.
 
-For now, we subset out all data rows that contain female residents and/or locations that do not follow the Floor + Tower + Block + Cell pattern. (This data is placed into two data frames, `data_f` and `m_specialLoc`, which we ignore for now but will need to add back in eventually.) We proceed only with data rows that contain male residents and 'standard' locations, which we put into a smaller data frame called `m_stdLoc`. Some SO Numbers in `m_stdLoc` also appear in `m_specialLoc`. (For example, many residents spend one day in Intake, a 'special' location, before going to a standard cell). Since we are ignoring `m_specialLoc` for now, any results regarding turnover rates, durations of stay, etc. should be taken with a grain of salt. 
+Then we subset out all data rows that contain female residents or locations that do not follow the Floor + Tower + Block + Cell pattern. This means that we exclude all data rows for the South Annex, the Marietta Annex, Central Holding, Central Release, Intake, Medical Holding, Weekenders, and In Transit Cells (since these locations are separate from the main jail and essentially have their own smaller networks). Data rows for male residents with locations that begin with 3LD (e.g., 3LD60) are included since these locations are on the third floor of the main jail. (For these locations, we consider the floor to be 3, the tower to be L, and the block to be D.) (Data rows for female residents in locations that begin with 3LD are NOT included.)
+
+We proceed only with data rows with male residents and 'standard' locations; we put these rows into a smaller data frame called `m_stdLoc`. Some SO Numbers in `m_stdLoc` also appear in `specialLoc`. (For example, many residents spend one day in Intake, a 'special' location, before going to a standard cell). This should be kept in mind when interpreting turnover rates, durations of stay, etc. 
 
 At the end of this step, we have two data frames that we will use going forward: `m_stdLoc` and `ids`. `ids` lists out all the residents who ever appear in `m_stdLoc` and assigns them each an `id` (starting with 1). There's a one-to-one mapping from SO Number to `id`, making them interchangeable, but we will use `id` from now on for simplicity. 
 
-```{r, child = 'Sections/Step0-InitialProcessing.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, child='Sections/Step0-InitialProcessing.Rmd', results='asis'}
 ```
 
 ## Step 1: Create an edge list of cell-level edges
@@ -135,15 +137,15 @@ In Step 10, we perform the same operations as in Step 9, but broken down by race
 
 ## Step 11: Estimate rate of cell changes within jail
 
-We begin by counting up the number of times that a location spell (in `cLocs`) ends without its corresponding activity spells (in `activeDays`) also ending. This represents the total number of times we believe that someone left their cell (and moved to a new one) without leaving the jail. We divide this number by the average active population size and divide again by the number of days in our timeframe of interest for scaling purposes. This gives us an estimate of the number of cell changes per person per day. This approach is better suited to timeframes in which we have daily data, without gaps. 
+We begin by counting up the number of times that a location spell (in `cLocs`) ends without its corresponding activity spells (in `activeDays`) also ending. This represents the total number of times we believe that someone left their cell (and moved to a new one) without leaving the jail. We divide this number by the average active population size and divide again by the number of days in our timeframe of interest for scaling purposes. This gives us an estimate of the number of cell changes per person per day. This approach is better suited to timeframes in which we have daily data, without gaps.
 
 Additionally, we count how many (and what percent of) cell changes were within the same floor vs. within the same floor and tower vs. within the same block. (The cell changes within the same block are a subset of the cell changes within the same floor and tower, which in turn are a subset of the cell changes within the same floor.)
 
-We also perform all of the above calculations broken down by race, age, and floor (i.e., the floor of the cell that is vacated). 
+We also perform all of the above calculations broken down by race, age, and floor (i.e., the floor of the cell that is vacated).
 
 Finally, we create a matrix showing how many cell changes were from Floor i to Floor j (for i,j = 1, 2, ..., 7). (In this matrix, the rows are for the cell that the person moved FROM and the columns are for the cell that the person moved TO.)
 
-Additionally, we can look at the average duration of the location spells in `cLocs`, broken down by censoring status (i.e., left-censored vs. right-censored vs. censored on both sides vs. not censored) and by attribute. This approach is better suited to longer timeframes. The column `percentSpells` indicates what percent of location spells for that particular attribute (e.g., Floor 7) have that censoring status. 
+Additionally, we can look at the average duration of the location spells in `cLocs`, broken down by censoring status (i.e., left-censored vs. right-censored vs. censored on both sides vs. not censored) and by attribute. This approach is better suited to longer timeframes. The column `percentSpells` indicates what percent of location spells for that particular attribute (e.g., Floor 7) have that censoring status.
 
 
 ```{r, child = 'Sections/Step11-CellTurnover.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
@@ -151,9 +153,9 @@ Additionally, we can look at the average duration of the location spells in `cLo
 
 ## Step 12: Estimate rate of block changes within jail
 
-We use the same approach that we used in Step 11 to now estimate the number of block changes per person per day. Again, this analysis is better suited to timeframes in which we have daily data, without gaps. We  perform these calculations overall and broken down by race, age, and floor (i.e., the floor of the block that is vacated). 
+We use the same approach that we used in Step 11 to now estimate the number of block changes per person per day. Again, this analysis is better suited to timeframes in which we have daily data, without gaps. We  perform these calculations overall and broken down by race, age, and floor (i.e., the floor of the block that is vacated).
 
-Additionally, we can look at the average duration of the location spells in `bLocs`, broken down by censoring status (i.e., left-censored vs. right-censored vs. censored on both sides vs. not censored) and by attribute. Again, this approach is better suited to longer timeframes.  
+Additionally, we can look at the average duration of the location spells in `bLocs`, broken down by censoring status (i.e., left-censored vs. right-censored vs. censored on both sides vs. not censored) and by attribute. Again, this approach is better suited to longer timeframes.
 
 ```{r, child = 'Sections/Step12-BlockTurnover.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
@@ -162,11 +164,11 @@ Additionally, we can look at the average duration of the location spells in `bLo
 
 In this section, we calculate turnover rates (into and out of the jail) overall and by attribute. We attempt to adapt the DOJ's definition of "weekly turnover rate" ("The sum of weekly admissions and releases divided by the average daily population") since we do not have consistent weekly data. Instead, we calculate the following:
 
-We add up the known admissions (i.e., the number of spells of activity, as defined in Step 3, that are not left-censored) and the known releases (i.e., the number of spells of activity, as defined in Step 3, that are not right-censored). These numbers include repeat admissions and releases. We calculate `TurnoverIn` by dividing the number of admissions by the average active network size (i.e., the average number of residents in the jail across the days for which we have data). Similarly, we calculate `TurnoverOut` by dividing the number of releases by the average active network size. Note that the numerators may be significantly underestimated if there are data gaps within the selected timeframe. For scaling purposes, we divide `TurnoverIn` and `TurnoverOut` by the number of days in our timeframe. These numbers represent, roughly, an (under)estimate of the number of daily admissions and releases, respectively, per resident. This approach is better suited to timeframes in which we have daily data, without gaps. 
+We add up the known admissions (i.e., the number of spells of activity, as defined in Step 3, that are not left-censored) and the known releases (i.e., the number of spells of activity, as defined in Step 3, that are not right-censored). These numbers include repeat admissions and releases. We calculate `TurnoverIn` by dividing the number of admissions by the average active network size (i.e., the average number of residents in the jail across the days for which we have data). Similarly, we calculate `TurnoverOut` by dividing the number of releases by the average active network size. Note that the numerators may be significantly underestimated if there are data gaps within the selected timeframe. For scaling purposes, we divide `TurnoverIn` and `TurnoverOut` by the number of days in our timeframe. These numbers represent, roughly, an (under)estimate of the number of daily admissions and releases, respectively, per resident. This approach is better suited to timeframes in which we have daily data, without gaps.
 
 We perform the above calculations overall and broken down by age, race, and floor. The calculations by age and race are a matter of straightforward subsetting (since age and race are static attributes); the calculations by floor are a little more involved. (For every non-left-censored spell of activity (i.e., admission), we check what floor the resident was in on the first day in that spell. We consider this the floor that they were admitted to. Similarly, for every non-right-censored spell of activity (i.e., release), we check what floor the resident was in on the last day in that spell. We consider this the floor that they were released from. Then we can count up the admissions and releases by floor.)
 
-Additionally, we can also look at the average duration of an active spell and the average number of locations per active spell. This approach is better suited to longer timeframes. We break these statistics down by censoring status (looking at spells of activity that are neither right- nor left-censored vs. spells that are right-censored only vs. spells that are left-censored only vs. spells that are censored on both sides). By definition, the average duration for spells that are censored on both sides is the number of days in the selected timeframe. 
+Additionally, we can also look at the average duration of an active spell and the average number of locations per active spell. This approach is better suited to longer timeframes. We break these statistics down by censoring status (looking at spells of activity that are neither right- nor left-censored vs. spells that are right-censored only vs. spells that are left-censored only vs. spells that are censored on both sides). By definition, the average duration for spells that are censored on both sides is the number of days in the selected timeframe.
 
 Specifically, if we look at 10/27 to 02/04, then both-censored spells are 101 days long by definition, and uncensored spells must, by definition, have started on or after 12/01 and ended on or before 01/31, meaning that they can be at most 62 days long. These short-term uncensored spells are about 11 days long on average. Interestingly, there is no obvious relationship between censoring category and the average number of locations per spell, suggesting that short-term residents move locations within the jail more frequently. As in Step 11, the column `percentSpells` indicates what percent of activity spells for that particular attribute (e.g., Floor 7) have that censoring status. Looking at this column, we can see that both-censored spells of activity are more common on higher floors and among younger residents.
 
@@ -175,7 +177,7 @@ Specifically, if we look at 10/27 to 02/04, then both-censored spells are 101 da
 
 ## Step 14: Consider long- vs. short-term residents
 
-This step is better suited to longer timeframes. 
+This step is better suited to longer timeframes.
 
 We consider residents to be 'long-term' if they have a single spell of activity that is censored on both sides (i.e., they are in every roster). We consider residents to be 'short-term' if they have at least one spell of activity that is uncensored (even if they have another censored spell of activity). (Note that some people are not classified as either).
 

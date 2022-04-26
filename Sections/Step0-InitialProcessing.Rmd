@@ -65,22 +65,32 @@ timeGaps <- which(timeGaps$SoNum==lag(timeGaps$SoNum) &
 #Subset only to the time frame of interest
 all_data <- all_data[all_data$Date >= firstDay & all_data$Date <= lastDay, ]
 
-#For now: Separate out women and men with special locations
+#Remove extra designations from location column
+all_data$Location <- gsub(" - Male", "", all_data$Location)
+all_data$Location <- gsub(" - Female", "", all_data$Location)
+all_data$Location <- gsub(" - Padded Cell", "", all_data$Location)
+
+#Separate men from women and standard from special locations
 data_m <- subset(all_data, Gender == "M")
 data_f <- subset(all_data, Gender == "F")
-data_m$Location <- gsub(" - Male", "", data_m$Location)
-data_f$Location <- gsub(" - Female", "", data_f$Location)
-if (nrow(all_data) != (nrow(data_f) + nrow(data_m))){
-  warning("Check for missing values in the Gender column")}
 m_stdLoc <- data_m[!grepl("[A-M]|[O-R]|[T-Z]|[a-z]", data_m$Location), ]
 m_specialLoc <- data_m[grepl("[A-M]|[O-R]|[T-Z]|[a-z]", data_m$Location), ]
-remove(data_m)
+if (nrow(data_m) != (nrow(m_stdLoc) + nrow(m_specialLoc))){
+  warning("Check for issues with the Location column")}
 
-#Check if any SO Numbers got split across data frames
+#Move data for male residents in 3LD## from specialLoc to m_stdLoc 
+loc3LD <- m_specialLoc[grepl("3LD", m_specialLoc$Location), ]
+m_specialLoc <- m_specialLoc[!(grepl("3LD", m_specialLoc$Location)), ]
+m_stdLoc <- rbind(m_stdLoc, loc3LD)
+if (nrow(all_data) != (nrow(m_stdLoc) + nrow(m_specialLoc) + nrow(data_f))){
+  warning("Check for issues with the Location or Gender column")}
+remove(loc3LD)
+
+#Check how many SO Numbers got split across data frames
 std_split <- subset(m_stdLoc, m_stdLoc$SoNum %in% m_specialLoc$SoNum)
 std_split <- std_split[!duplicated(std_split$SoNum),]
 
-#Continuing only with men with standard locations...
+#Continuing only with standard locations...
 
 #Calculate how many times each person appears in the data and in how many places
 ids <- m_stdLoc %>% group_by(SoNum) %>%
