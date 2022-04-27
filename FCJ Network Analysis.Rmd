@@ -96,7 +96,7 @@ We start by making the same changes to `bEdges` that we made to `cEdges` in Step
 
 Because the block-level network is huge, it is impractical to create a block-level `networkDynamic` object here, so instead, we either load in a previously created object or create a series of static `network` objects.
 
-Currently, a block-level `networkDynamic` object (`bDynNW`) is only available for the 10/27 - 02/04 time frame. If that is the specified time frame of interest, we load in `bDynNW`, then set age, race, and gender as (static) vertex attributes and activate nodes based on `activeDays` as we did in Step 5 for the cell-level network. (Note that `bDynNW` has a dynamic (TEA) node attribute called `location` crated from `cLocs` (NOT `bLocs`) that tells us what cell (NOT block) the node is in when known/assumed.)
+Currently, a block-level `networkDynamic` object (`bDynNW`) is only available for the 10/27 - 02/04 time frame. If that is the specified time frame of interest, we load in `bDynNW`, then set age, race, and gender as (static) vertex attributes and activate nodes based on `activeDays` as we did in Step 5 for the cell-level network. (Note that `bDynNW` also has a dynamic (TEA) node attribute called `location` created from `bLocs` that tells us what block the node is in when known/assumed.)
 
 If any other time frame has been specified, then we take the approach of creating a static `network` object for each time point for which we have a roster (using only the nodes and edges that are active at that time point). The nodes in these static networks have 4 attributes: age, race, gender, and floor.   
 
