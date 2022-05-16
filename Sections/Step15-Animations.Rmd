@@ -84,8 +84,7 @@ animateCellNetwork <- function(floor, tower, block)
                       aggregate.dur = 1, rule = "any")
   render.par <- list(tween.frames = 10, show.time = FALSE)
   plot.par <- list(mar = c(0, 0, 0, 0))
-  compute.animation(dynNW, slice.par = slice.par, verbose = FALSE,
-                    animation.mode='MDSJ')
+  compute.animation(dynNW, slice.par = slice.par, verbose = FALSE)
 
   render.d3movie(
     dynNW,
