@@ -1,8 +1,14 @@
 ---
-title: "FCJ Network Analysis"
-author: "Karina Wallrafen-Sam"
-date: "3/24/2022"
-output: html_document
+title: "Fulton County Jail Network Analysis"
+author: "EpiModel Research Lab"
+date: "January to April, 2022"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    collapsed: no
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -10,10 +16,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, include=FALSE}
-firstDay <- as.Date("2021-10-27")
-lastDay <- as.Date("2022-02-04")
+firstDay <- as.Date("2022-01-11")
+lastDay <- as.Date("2022-04-11")
 
-days <- c(1, 2, 5, 11, 17, 25) #Day indices for degree dist plots -- ideally 6
+days <- c(1, 6, 11, 15, 20, 25) #Day indices for degree dist plots -- ideally 6
 
 EstimateLocDurations <- TRUE #If T, calculate avg time spent in a block/cell
 EstimateDurations <- TRUE #If T, calculate avg time spent in jail
