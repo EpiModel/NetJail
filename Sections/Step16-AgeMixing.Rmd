@@ -31,7 +31,8 @@ doubledEdges$InitialAge <- NULL
 
 #On First Day
 time1 <- doubledEdges[doubledEdges$onset == -Inf, ]
-time1 <- time1 %>% group_by(head.age, tail.age) %>% summarise(numEdges = n())
+time1 <- time1 %>% group_by(head.age, tail.age) %>% 
+  summarise(numEdges = n(), .groups = "drop_last")
 time1.mat <- time1 %>% pivot_wider(names_from = tail.age, 
                                    values_from = numEdges)
 cat('\n####', 'Age Mixing on ', as.character(firstDay), '(Numbers)', '\n')
@@ -47,7 +48,7 @@ time1.props.mat <- time1.props %>% pivot_wider(names_from = tail.age,
 #On Last Day
 timen <- doubledEdges[doubledEdges$terminus == Inf, ]
 timen <- timen %>% group_by(head.age, tail.age) %>%
-  summarise(numEdges = n())
+  summarise(numEdges = n(), .groups = "drop_last")
 timen.mat <- timen %>%
   pivot_wider(names_from = tail.age, values_from = numEdges)
 cat('\n####', 'Age Mixing on ', as.character(lastDay), '(Numbers)', '\n')

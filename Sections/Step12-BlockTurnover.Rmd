@@ -128,7 +128,7 @@ knitr::kable(block_changes[ ,c("Category", "BlockChangeRate",
 #Floor change matrix
 locChanges2$nextFloor <- substr(locChanges2$nextLoc, 1, 2)
 blockChangesByFloor <- locChanges2 %>% group_by(Floor, nextFloor) %>% 
-  summarise(numChanges = n())
+  summarise(numChanges = n(), .groups = "drop_last")
 blockChangesByFloor.mat <- blockChangesByFloor %>% 
   pivot_wider(names_from = nextFloor, values_from = numChanges)
 knitr::kable(blockChangesByFloor.mat)
@@ -155,23 +155,24 @@ if (EstimateLocDurations == TRUE) {
   locDurations$Floor <- substr(locDurations$loc, 0, 1)
   
   locDurations1 <- locDurations %>% group_by(startCensored, endCensored) %>% 
-    summarise(category = "Overall", meanDur = mean(duration), numSpells = n())
+    summarise(category = "Overall", meanDur = mean(duration), numSpells = n(),
+              .groups = "drop_last")
   
   locDurations2 <- locDurations %>% 
     group_by(startCensored, endCensored, Floor) %>% 
-    summarise(meanDur = mean(duration), numSpells = n())
+    summarise(meanDur = mean(duration), numSpells = n(), .groups = "drop_last")
   locDurations2$Floor <- paste("Floor", locDurations2$Floor)
   names(locDurations2)[names(locDurations2) == 'Floor'] <- 'category'
   
   locDurations3 <- locDurations %>% 
     group_by(startCensored, endCensored, Race) %>% 
-    summarise(meanDur = mean(duration), numSpells = n())
+    summarise(meanDur = mean(duration), numSpells = n(), .groups = "drop_last")
   locDurations3$Race <- paste("Race", locDurations3$Race)
   names(locDurations3)[names(locDurations3) == 'Race'] <- 'category'
   
   locDurations4 <- locDurations %>% 
     group_by(startCensored, endCensored, InitialAge) %>% 
-    summarise(meanDur = mean(duration), numSpells = n())
+    summarise(meanDur = mean(duration), numSpells = n(), .groups = "drop_last")
   locDurations4$InitialAge <- paste("Age", locDurations4$InitialAge)
   names(locDurations4)[names(locDurations4) == 'InitialAge'] <- 'category'
   

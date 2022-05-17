@@ -17,7 +17,7 @@ bEdges$lastTime <- NULL
 #Create dynamic network object
 if (firstDay == as.Date("2021-10-27") & lastDay == as.Date("2022-02-04")) {
   #Load in previously created dynamic network object
-  load("../bDynNW.Rds")
+  load("../data/output/bDynNW.Rds")
 
   #Set vertex attributes
   bDynNW <- set.vertex.attribute(bDynNW, "Race", ids$Race)

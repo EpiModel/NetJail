@@ -25,9 +25,12 @@ for (i in seq_len(nrow(dates))){
   currNodes[currNodes$race != "White" & currNodes$race != "Black", ]$race <- 
     "Other"
 
-  dist_f <- currNodes %>% group_by(floor, degree) %>% summarise(count = n())
-  dist_r <- currNodes %>% group_by(race, degree) %>% summarise(count = n())
-  dist_a <- currNodes %>% group_by(age, degree) %>% summarise(count = n())
+  dist_f <- currNodes %>% group_by(floor, degree) %>% 
+    summarise(count = n(), .groups = "drop_last")
+  dist_r <- currNodes %>% group_by(race, degree) %>% 
+    summarise(count = n(), .groups = "drop_last")
+  dist_a <- currNodes %>% group_by(age, degree) %>% 
+    summarise(count = n(), .groups = "drop_last")
 
   names(dist_f)[names(dist_f) == "count"] <- toString(dates$Date[i])
   names(dist_r)[names(dist_r) == "count"] <- toString(dates$Date[i])
@@ -101,7 +104,7 @@ cDegDists_floor2 <- cDegDists_floor2[complete.cases(cDegDists_floor2), ]
 cMeanDeg_floor <- cDegDists_floor2 %>% group_by(floor, Date) %>% 
   summarise(MeanDeg = weighted.mean(degree, Number), 
             SD = SD(degree, weights = Number), min = min(degree), 
-            max = max(degree))
+            max = max(degree), .groups = "drop_last")
 cat('\n####', 'Mean Degree over Time by Floor', '\n')
 par(mfrow = c(2,2))
 floors <- 1:7
@@ -138,7 +141,7 @@ cDegDists_race2 <- cDegDists_race2[complete.cases(cDegDists_race2), ]
 cMeanDeg_race <- cDegDists_race2 %>% group_by(race, Date) %>% 
   summarise(MeanDeg = weighted.mean(degree, Number), 
             SD = SD(degree, weights = Number), min = min(degree),
-            max = max(degree))
+            max = max(degree), .groups = "drop_last")
 races <- c("Black", "White", "Other")
 cat('\n####', 'Mean Degree over Time by Race', '\n')
 max.y <- ceiling(max(cMeanDeg_race$MeanDeg) * 10) / 10
@@ -175,7 +178,7 @@ cDegDists_age2 <- cDegDists_age2[complete.cases(cDegDists_age2), ]
 cMeanDeg_age <- cDegDists_age2 %>% group_by(age, Date) %>% 
   summarise(MeanDeg = weighted.mean(degree, Number), 
             SD = SD(degree, weights = Number), min = min(degree),
-            max = max(degree))
+            max = max(degree), .groups = "drop_last")
 ages <- c("Under 20", "20 - 29", "30 - 39", "40 - 49", "50 - 59", "60+")
 cat('\n####', 'Mean Degree over Time by Age Group', '\n')
 max.y <- ceiling(max(cMeanDeg_age$MeanDeg) * 10) / 10

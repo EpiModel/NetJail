@@ -27,6 +27,7 @@ animateCellNetwork <- function(floor, tower, block)
   #Create a counter that increments for every new contact
   pairs <- pairs[with(pairs, order(id.x, id.y, DayIndex)), ]
   ind <- which(pairs$id.x==lag(pairs$id.x) & pairs$id.y==lag(pairs$id.y) &
+                 pairs$Cell == lag(pairs$Cell) &
                  pairs$DayIndex==(lag(pairs$DayIndex) + 1))
   pairs$newContact <- "True"
   pairs[ind, ]$newContact <- "False"

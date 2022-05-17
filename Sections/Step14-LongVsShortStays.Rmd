@@ -30,10 +30,12 @@ if (AnalyseShortVsLong == TRUE) {
   
   types1 <- ids %>% group_by(type) %>% summarise(category = "Overall", 
                                                  numPeople = n())
-  types2 <- ids2 %>% group_by(Race, type) %>% summarise(numPeople = n())
+  types2 <- ids2 %>% group_by(Race, type) %>% 
+    summarise(numPeople = n(), .groups = "drop_last")
   names(types2)[names(types2) == 'Race'] <- 'category'
   types2$category <- paste("Race", types2$category)
-  types3 <- ids2 %>% group_by(InitialAge, type) %>% summarise(numPeople = n())
+  types3 <- ids2 %>% group_by(InitialAge, type) %>% 
+    summarise(numPeople = n(), .groups = "drop_last")
   names(types3)[names(types3) == 'InitialAge'] <- 'category'
   types3$category <- paste("Age", types3$category)
   
@@ -74,7 +76,7 @@ if (AnalyseShortVsLong == TRUE) {
   cat('\n')
   
   #Estimate average duration of cell location spell for long vs short term
-  if (EstimateLocDurations == TRUE) {
+  if (AnalyseShortVsLong == TRUE & EstimateLocDurations == TRUE) {
     locDurations <- cLocs
     locDurations$startCensored <- "N"
     locDurations$startCensored[locDurations$onset == -Inf ] <- "Y"
@@ -88,7 +90,8 @@ if (AnalyseShortVsLong == TRUE) {
     
     cLocDurations2 <- locDurations %>% 
       group_by(startCensored, endCensored, type) %>% 
-      summarise(meanDur = mean(duration), numSpells = n())
+      summarise(meanDur = mean(duration), numSpells = n(), 
+                .groups = "drop_last")
     names(cLocDurations2)[names(cLocDurations2) == 'type'] <- 'category'
     cLocDurations2$category <- cLocDurations2$category %>% replace_na('Neither')
     
@@ -101,7 +104,7 @@ if (AnalyseShortVsLong == TRUE) {
   }
   
   #Estimate average duration of block location spell for long vs short term
-  if (EstimateLocDurations == TRUE) {
+  if (AnalyseShortVsLong == TRUE & EstimateLocDurations == TRUE) {
     locDurations <- bLocs
     locDurations$startCensored <- "N"
     locDurations$startCensored[locDurations$onset == -Inf ] <- "Y"
@@ -115,7 +118,8 @@ if (AnalyseShortVsLong == TRUE) {
     
     bLocDurations2 <- locDurations %>% 
       group_by(startCensored, endCensored, type) %>% 
-      summarise(meanDur = mean(duration), numSpells = n())
+      summarise(meanDur = mean(duration), numSpells = n(), 
+                .groups = "drop_last")
     names(bLocDurations2)[names(bLocDurations2) == 'type'] <- 'category'
     bLocDurations2$category <- bLocDurations2$category %>% replace_na('Neither')
     

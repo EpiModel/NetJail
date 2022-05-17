@@ -148,25 +148,25 @@ if (EstimateDurations == TRUE) {
   
   durations1 <- durations %>% group_by(startCensored, endCensored) %>%
     summarise(category = "Overall", meanDur = mean(duration), numSpells = n(), 
-              meanNumLocs = mean(numLocs))
+              meanNumLocs = mean(numLocs), .groups = "drop_last")
   
   durations2 <- durations %>% 
     group_by(startCensored, endCensored, InitialFloor) %>% 
     summarise(meanDur = mean(duration), numSpells = n(), 
-              meanNumLocs = mean(numLocs))
+              meanNumLocs = mean(numLocs), .groups = "drop_last")
   durations2$InitialFloor <- paste("Floor", durations2$InitialFloor)
   names(durations2)[names(durations2) == "InitialFloor"] <- 'category'
   
   durations3 <- durations %>% group_by(startCensored, endCensored, Race) %>% 
     summarise(meanDur = mean(duration), numSpells = n(), 
-              meanNumLocs = mean(numLocs))
+              meanNumLocs = mean(numLocs), .groups = "drop_last")
   durations3$Race <- paste("Race", durations3$Race)
   names(durations3)[names(durations3) == 'Race'] <- 'category'
   
   durations4 <- durations %>% 
     group_by(startCensored, endCensored, InitialAge) %>% 
     summarise(meanDur = mean(duration), numSpells = n(), 
-              meanNumLocs = mean(numLocs))
+              meanNumLocs = mean(numLocs), .groups = "drop_last")
   durations4$InitialAge <- paste("Age", durations4$InitialAge)
   names(durations4)[names(durations4) == 'InitialAge'] <- 'category'
   
