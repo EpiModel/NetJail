@@ -28,40 +28,45 @@ doubledEdges$tail.age <- cut(doubledEdges$InitialAge,
                                                        "30 - 39", "40 - 49",
                                                        "50 - 59", "60+"))
 doubledEdges$InitialAge <- NULL
+```
 
+#### Age Mixing on `r as.character(firstDay)` (Numbers)
+
+```{r}
 #On First Day
 time1 <- doubledEdges[doubledEdges$onset == -Inf, ]
 time1 <- time1 %>% group_by(head.age, tail.age) %>% 
   summarise(numEdges = n(), .groups = "drop_last")
 time1.mat <- time1 %>% pivot_wider(names_from = tail.age, 
                                    values_from = numEdges)
-cat('\n####', 'Age Mixing on ', as.character(firstDay), '(Numbers)', '\n')
 knitr::kable(time1.mat)
-cat('\n')
 
 time1.props <- time1 %>% group_by(head.age) %>%
   mutate(propEdges = numEdges / sum(numEdges))
 time1.props$numEdges <- NULL
 time1.props.mat <- time1.props %>% pivot_wider(names_from = tail.age, 
                                                values_from = propEdges)
+```
 
+#### Age Mixing on `r as.character(lastDay)` (Numbers)
+
+```{r}
 #On Last Day
 timen <- doubledEdges[doubledEdges$terminus == Inf, ]
 timen <- timen %>% group_by(head.age, tail.age) %>%
   summarise(numEdges = n(), .groups = "drop_last")
 timen.mat <- timen %>%
   pivot_wider(names_from = tail.age, values_from = numEdges)
-cat('\n####', 'Age Mixing on ', as.character(lastDay), '(Numbers)', '\n')
 knitr::kable(timen.mat)
-cat('\n')
 
 timen.props <- timen %>% group_by(head.age) %>%
   mutate(propEdges = numEdges / sum(numEdges))
 timen.props$numEdges <- NULL
 timen.props.mat <- timen.props %>% pivot_wider(names_from = tail.age, 
                                                values_from = propEdges)
+```
 
-
+```{r}
 #Plot number of edges
 cols = rev(colorRampPalette(c('darkred','red','blue','lightblue'))(24))
 minval <- min(min(time1$numEdges), min(timen$numEdges))

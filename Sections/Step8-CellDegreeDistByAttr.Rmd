@@ -50,8 +50,11 @@ for (i in seq_len(nrow(dates))){
   }
 }
 remove(dist_f, dist_r, dist_a, currNW, currNodes)
+```
 
-cat('\n####', 'Degree Distributions for Selected Floors & Time Points', '\n')
+#### Degree Distributions for Selected Floors & Time Points
+
+```{r} 
 #Histograms of degree distribution by floor:
 par(mfrow = c(3,2))
 floors <- c(2, 7)
@@ -64,10 +67,12 @@ for (j in seq_along(floors)) {
                      floors[j], sep=" "))
   }
 }
-cat('\n')
+```
 
+#### Degree Distributions for Selected Races & Time Points
+
+```{r}
 #Histograms of degree distribution by race:
-cat('\n####', 'Degree Distributions for Selected Races & Time Points', '\n')
 par(mfrow = c(3,2))
 races <- c("Black", "White")
 for (j in seq_along(races)) {
@@ -79,10 +84,12 @@ for (j in seq_along(races)) {
                      races[j], "Residents", sep=" "))
   }
 }
-cat('\n')
+```
 
+#### Degree Distributions for Selected Age Groups & Time Points
+
+```{r}
 #Histograms of degree distribution by age:
-cat('\n####', 'Degree Distributions for Selected Age Groups & Time Points', '\n')
 par(mfrow = c(3,2))
 ages <- c("20 - 29", "40 - 49")
 for (j in seq_along(ages)) {
@@ -94,8 +101,11 @@ for (j in seq_along(ages)) {
                      "for", ages[j], "Yr. Olds", sep=" "))
   }
 }
-cat('\n')
+```
 
+#### Mean Degree over Time by Floor
+
+```{r}
 #Mean degree by floor at each time point
 cDegDists_floor2 <- gather(cDegDists_floor, key = "Date", value = "Number", 
                           -floor, -degree)
@@ -105,7 +115,6 @@ cMeanDeg_floor <- cDegDists_floor2 %>% group_by(floor, Date) %>%
   summarise(MeanDeg = weighted.mean(degree, Number), 
             SD = SD(degree, weights = Number), min = min(degree), 
             max = max(degree), .groups = "drop_last")
-cat('\n####', 'Mean Degree over Time by Floor', '\n')
 par(mfrow = c(2,2))
 floors <- 1:7
 max.y <- ceiling(max(cMeanDeg_floor$MeanDeg) * 10) / 10
@@ -131,8 +140,11 @@ for (i in seq_along(floors)){
 grid.arrange(f1, f2, f3, f4, ncol = 2)
 grid.arrange(f5, f6, f7, ncol = 2)
 remove(cDegDists_floor2, temp, f1, f2, f3, f4, f5, f6, f7)
-cat('\n')
+```
 
+#### Mean Degree over Time by Race
+
+```{r}
 #Mean degree by race at each time point
 cDegDists_race2 <- gather(cDegDists_race, key = "Date", value = "Number", 
                           -race, -degree)
@@ -143,7 +155,6 @@ cMeanDeg_race <- cDegDists_race2 %>% group_by(race, Date) %>%
             SD = SD(degree, weights = Number), min = min(degree),
             max = max(degree), .groups = "drop_last")
 races <- c("Black", "White", "Other")
-cat('\n####', 'Mean Degree over Time by Race', '\n')
 max.y <- ceiling(max(cMeanDeg_race$MeanDeg) * 10) / 10
 min.y <- floor(min(cMeanDeg_race$MeanDeg) * 10) / 10
 par(mfrow = c(2,2))
@@ -168,8 +179,11 @@ for (i in seq_along(races)){
 }
 grid.arrange(r1, r2, r3, ncol = 2)
 remove(cDegDists_race2, temp, r1, r2, r3)
-cat('\n')
+```
 
+#### Mean Degree over Time by Age Group 
+
+```{r}
 #Mean degree by age at each time point
 cDegDists_age2 <- gather(cDegDists_age, key = "Date", value = "Number", 
                           -age, -degree)
@@ -180,7 +194,6 @@ cMeanDeg_age <- cDegDists_age2 %>% group_by(age, Date) %>%
             SD = SD(degree, weights = Number), min = min(degree),
             max = max(degree), .groups = "drop_last")
 ages <- c("Under 20", "20 - 29", "30 - 39", "40 - 49", "50 - 59", "60+")
-cat('\n####', 'Mean Degree over Time by Age Group', '\n')
 max.y <- ceiling(max(cMeanDeg_age$MeanDeg) * 10) / 10
 min.y <- floor(min(cMeanDeg_age$MeanDeg) * 10) / 10
 par(mfrow = c(2,2))
@@ -208,14 +221,15 @@ for (i in seq_along(ages)){
 grid.arrange(a1, a2, a3, a4, ncol = 2)
 grid.arrange(a5, a6, ncol = 2, heights=unit(0.5, "npc"))
 remove(cDegDists_age2, a1, a2, a3, a4, a5, a6, g, temp)
-cat('\n')
+```
 
+#### Mean Degree Averaged Across Selected Timespan (by Attribute)
+    
+```{r}
 #Mean degree by floor averaged across all data
 cOverallMeanDeg_floor <- cMeanDeg_floor %>% group_by(floor) %>% 
   summarise(OverallMeanDeg = mean(MeanDeg), sd = sd(MeanDeg), 
             min = min(MeanDeg), max = max(MeanDeg))
-cat('\n####', 'Mean Degree Averaged Across Selected Timespan (by Attribute)', 
-    '\n')
 par(mfrow = c(1,1))
 ggplot(cOverallMeanDeg_floor,aes(x=floor)) + 
   geom_boxplot(aes(lower=(OverallMeanDeg-sd), upper=(OverallMeanDeg+sd), 
@@ -250,7 +264,6 @@ ggplot(cOverallMeanDeg_age,aes(x=age)) +
   ggtitle(paste0("Mean degree averaged across ", firstDay, " to ", 
              lastDay, " by Age")) +
   xlab("Age") + ylab("Mean Degree")
-cat('\n')
 
 #Remove unneeded variables
 remove(i, j, races, floors, ages)

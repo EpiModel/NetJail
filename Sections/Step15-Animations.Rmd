@@ -99,12 +99,16 @@ animateCellNetwork <- function(floor, tower, block)
     verbose = FALSE,
     output.mode = "htmlWidget")
 }
+```
 
-cat('\n####', 'Floor 2, Tower S, Block 1', '\n')
+#### Floor 2, Tower S, Block 1
+
+```{r}
 animateCellNetwork(floor = 2, tower = 'S', block = 1)
-cat('\n')
+```
 
-cat('\n####', 'Floor 7, Tower S, Block 5', '\n')
+#### Floor 7, Tower S, Block 5
+
+```{r}
 animateCellNetwork(floor = 7, tower = 'S', block = 5)
-cat('\n')
 ```

@@ -78,9 +78,6 @@ plot(x = bMeanDeg$dates.Date, y = bMeanDeg$bMeanDeg,
 
 #Mean degree averaged across all (selected) days of data
 bOverallMeanDeg <- mean(bMeanDeg$bMeanDeg)
-print(paste0("The block-level mean degree averaged across the days from ", 
-             firstDay, " to ", lastDay, " is ", 
-             round(bOverallMeanDeg, digits = 4), " edges per node."))
-
 ```
 
+##### The block-level mean degree averaged across the days from `r firstDay` to `r lastDay` is `r round(bOverallMeanDeg, digits = 4)` edges per node.

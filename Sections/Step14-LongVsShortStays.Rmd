@@ -68,69 +68,69 @@ if (AnalyseShortVsLong == TRUE) {
   durations <- merge(durations, ids[ , c("id", "type")], by = "id")
   meanDurLT <- mean(durations[durations$type %in% c("Long-Term"), ]$duration)
   meanDurST <- mean(durations[durations$type %in% c("Short-Term"), ]$duration)
+}
+```  
+
+##### The mean active spell duration for long-term residents is `r meanDurLT` days (by definition).
+
+##### The mean active spell duration for short-term residents is `r meanDurST` days.
+
+```{r}  
+#Estimate average duration of cell location spell for long vs short term
+if (AnalyseShortVsLong == TRUE & EstimateLocDurations == TRUE) {
+  locDurations <- cLocs
+  locDurations$startCensored <- "N"
+  locDurations$startCensored[locDurations$onset == -Inf ] <- "Y"
+  locDurations$endCensored <- "N"
+  locDurations$endCensored[locDurations$terminus == Inf ] <- "Y"
+  locDurations$onset[locDurations$onset == -Inf] <- 1
+  locDurations$terminus[locDurations$terminus == Inf] <- max(dates$DayNum) + 1
+  locDurations$duration <- locDurations$terminus - locDurations$onset
+  locDurations <- merge(locDurations, ids[ , c("id", "type")], 
+                        by = "id")
   
-  cat('\n####', 'The mean active spell duration for long-term residents is', 
-      meanDurLT, 'days (by definition)', '\n')
-  cat('\n####', 'The mean active spell duration for short-term residents is', 
-      meanDurST, 'days', '\n')
-  cat('\n')
+  cLocDurations2 <- locDurations %>% 
+    group_by(startCensored, endCensored, type) %>% 
+    summarise(meanDur = mean(duration), numSpells = n(), 
+              .groups = "drop_last")
+  names(cLocDurations2)[names(cLocDurations2) == 'type'] <- 'category'
+  cLocDurations2$category <- cLocDurations2$category %>% replace_na('Neither')
   
-  #Estimate average duration of cell location spell for long vs short term
-  if (AnalyseShortVsLong == TRUE & EstimateLocDurations == TRUE) {
-    locDurations <- cLocs
-    locDurations$startCensored <- "N"
-    locDurations$startCensored[locDurations$onset == -Inf ] <- "Y"
-    locDurations$endCensored <- "N"
-    locDurations$endCensored[locDurations$terminus == Inf ] <- "Y"
-    locDurations$onset[locDurations$onset == -Inf] <- 1
-    locDurations$terminus[locDurations$terminus == Inf] <- max(dates$DayNum) + 1
-    locDurations$duration <- locDurations$terminus - locDurations$onset
-    locDurations <- merge(locDurations, ids[ , c("id", "type")], 
-                          by = "id")
-    
-    cLocDurations2 <- locDurations %>% 
-      group_by(startCensored, endCensored, type) %>% 
-      summarise(meanDur = mean(duration), numSpells = n(), 
-                .groups = "drop_last")
-    names(cLocDurations2)[names(cLocDurations2) == 'type'] <- 'category'
-    cLocDurations2$category <- cLocDurations2$category %>% replace_na('Neither')
-    
-    cLocDurations2 <- cLocDurations2[with(cLocDurations2, order(category)), ]
-    cLocDurations2 <- cLocDurations2 %>% group_by(category) %>%
-      mutate(percentSpells = numSpells / sum(numSpells)) 
-    print(knitr::kable(cLocDurations2, 
-                       caption = "Mean duration of cell-level location spells 
+  cLocDurations2 <- cLocDurations2[with(cLocDurations2, order(category)), ]
+  cLocDurations2 <- cLocDurations2 %>% group_by(category) %>%
+    mutate(percentSpells = numSpells / sum(numSpells)) 
+  print(knitr::kable(cLocDurations2, 
+                     caption = "Mean duration of cell-level location spells 
                      for long- vs. short-term residents"))
-  }
+}
+
+#Estimate average duration of block location spell for long vs short term
+if (AnalyseShortVsLong == TRUE & EstimateLocDurations == TRUE) {
+  locDurations <- bLocs
+  locDurations$startCensored <- "N"
+  locDurations$startCensored[locDurations$onset == -Inf ] <- "Y"
+  locDurations$endCensored <- "N"
+  locDurations$endCensored[locDurations$terminus == Inf ] <- "Y"
+  locDurations$onset[locDurations$onset == -Inf] <- 1
+  locDurations$terminus[locDurations$terminus == Inf] <- max(dates$DayNum) + 1
+  locDurations$duration <- locDurations$terminus - locDurations$onset
+  locDurations <- merge(locDurations, ids[ , c("id", "type")], 
+                        by = "id")
   
-  #Estimate average duration of block location spell for long vs short term
-  if (AnalyseShortVsLong == TRUE & EstimateLocDurations == TRUE) {
-    locDurations <- bLocs
-    locDurations$startCensored <- "N"
-    locDurations$startCensored[locDurations$onset == -Inf ] <- "Y"
-    locDurations$endCensored <- "N"
-    locDurations$endCensored[locDurations$terminus == Inf ] <- "Y"
-    locDurations$onset[locDurations$onset == -Inf] <- 1
-    locDurations$terminus[locDurations$terminus == Inf] <- max(dates$DayNum) + 1
-    locDurations$duration <- locDurations$terminus - locDurations$onset
-    locDurations <- merge(locDurations, ids[ , c("id", "type")], 
-                          by = "id")
-    
-    bLocDurations2 <- locDurations %>% 
-      group_by(startCensored, endCensored, type) %>% 
-      summarise(meanDur = mean(duration), numSpells = n(), 
-                .groups = "drop_last")
-    names(bLocDurations2)[names(bLocDurations2) == 'type'] <- 'category'
-    bLocDurations2$category <- bLocDurations2$category %>% replace_na('Neither')
-    
-    
-    bLocDurations2 <- bLocDurations2[with(bLocDurations2, order(category)), ]
-    bLocDurations2 <- bLocDurations2 %>% group_by(category) %>%
-      mutate(percentSpells = numSpells / sum(numSpells)) 
-    print(knitr::kable(bLocDurations2, 
-                       caption = "Mean duration of block-level location spells 
+  bLocDurations2 <- locDurations %>% 
+    group_by(startCensored, endCensored, type) %>% 
+    summarise(meanDur = mean(duration), numSpells = n(), 
+              .groups = "drop_last")
+  names(bLocDurations2)[names(bLocDurations2) == 'type'] <- 'category'
+  bLocDurations2$category <- bLocDurations2$category %>% replace_na('Neither')
+  
+  
+  bLocDurations2 <- bLocDurations2[with(bLocDurations2, order(category)), ]
+  bLocDurations2 <- bLocDurations2 %>% group_by(category) %>%
+    mutate(percentSpells = numSpells / sum(numSpells)) 
+  print(knitr::kable(bLocDurations2, 
+                     caption = "Mean duration of block-level location spells 
                      for long- vs. short-term residents"))
-    
-  }
+  
 }
 ```

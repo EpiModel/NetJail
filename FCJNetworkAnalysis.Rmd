@@ -26,11 +26,7 @@ EstimateDurations <- TRUE #If T, calculate avg time spent in jail
 AnalyseShortVsLong <- TRUE #If T, consider short vs long-term residents
 ```
 
-```{r, results = 'asis', echo = FALSE}
-cat('\n###', 'All analyses below use data from', as.character(firstDay), 'to', 
-    as.character(lastDay), '\n')
-cat('\n')
-```
+### All analyses below use data from `r as.character(firstDay)` to `r as.character(lastDay)`.
 
 ## Step 0: Load in data and conduct initial processing/cleaning
 
@@ -51,9 +47,9 @@ At the end of this step, we have two data frames that we will use going forward:
 
 We create `dates`, which assigns two numerical values to each date for which we have data: `DayIndex` and `DayNum`. `DayIndex` is basically the roster number and `DayNum` tells us how many days have passed since the of the first roster. For example, if are considering the original full dataset (from 10/27 to 02/04), then for December 1st, 2021, `DayIndex` is 2 (since this is our second roster) and `DayNum` is 36.
 
-In order to list out all cell-level edges, we start by merging `cDailyLoc` (which is basically `m_stdLoc` but with the columns reorganized) with itself and only keep rows where `id.x` is less than `id.y`. This gives us a list of pairs of residents who were ever in the same cell on the same day. We then create a counter that increments every time (a) the pairing changes, (b) there's a time gap, OR (c) the location changes. (a) is self-explanatory. (b) means that if we are looking at the original full dataset and Person A and Person B were in a cell together in Roster 1 (on 10/27, or Day 1), NOT in a cell together in Roster 2 (on 12/01, or Day 36), and in a cell together again in Roster 3 (on 12/08, or Day 43), then we create one edge between A and B that is present on Day 1 (10/27) and gone on Day 2 (10/28) and another that forms on Day 43 (12/08). (c) means that if we are looking at the original full dataset and Person A and Person B were in Cell 1 together in Roster 1 (on 10/27, or Day 1) and in Cell 2 together in Roster 2 (on 12/01, or Day 36), we create one edge between A and B that is present on Day 1 (10/27) and gone on Day 2 (10/28) and another that forms on Day 36 (12/01). 
+In order to list out all cell-level edges, we start by merging `cDailyLoc` (which is basically `m_stdLoc` but with the columns reorganized) with itself and only keep rows where `id.x` is less than `id.y`. This gives us a list of pairs of residents who were ever in the same cell on the same day. We then create a counter that increments every time (a) the pairing changes, (b) there's a time gap, OR (c) the location changes. (a) is self-explanatory. (b) means that if we are looking at the original full dataset and Person A and Person B were in a cell together in Roster 1 (on 10/27, or Day 1), NOT in a cell together in Roster 2 (on 12/01, or Day 36), and in a cell together again in Roster 3 (on 12/08, or Day 43), then we create one edge between A and B that is present on Day 1 (10/27) and gone on Day 2 (10/28) and another that forms on Day 43 (12/08). (c) means that if we are looking at the original full dataset and Person A and Person B were in Cell 1 together in Roster 1 (on 10/27, or Day 1) and in Cell 2 together in Roster 2 (on 12/01, or Day 36), we create one edge between A and B that is present on Day 1 (10/27) and gone on Day 2 (10/28) and another that forms on Day 36 (12/01).
 
-Once we have this counter, creating the cell-level edge list is straightforward: we group on the counter and list out the id for the head, the id for the tail, the day number on which the edge is first present, and the day number on which the edge is last present. We also note if edges are left-censored and/or right-censored. This information is stored in `cEdges`. 
+Once we have this counter, creating the cell-level edge list is straightforward: we group on the counter and list out the id for the head, the id for the tail, the day number on which the edge is first present, and the day number on which the edge is last present. We also note if edges are left-censored and/or right-censored. This information is stored in `cEdges`.
 
 ```{r, child = 'Sections/Step1-CellEdgeList.Rmd', include = FALSE}
 ```
@@ -71,9 +67,9 @@ We create one data frame, `cLocs`, that lists out timeframes when we know (or be
 
 For example, say that we are looking at the original full dataset (from 10/27 to 02/04) and that Person A is in Cell 1 in Roster 1 (on 10/27, or Day 1) and is still in Cell 1 in Roster 2 (on 12/01, or Day 36). Then we assume Person A was (a) 'active' (i.e., in the jail) and (b) located in Cell 1 the whole time between Day 1 and Day 36, too. If Person A is in Cell 1 in Roster 1 (on 10/27, or Day 1) and is in Cell 2 in Roster 2 (on 12/01, or Day 36), then we assume that Person A was also 'active' on Days 2 - 35 but we do not assume anything about their particular location in the jail during that time.
 
-For a real example, consider SO Number P00069424 (node 10). This person is in Roster 1 (on 10/27, or Day 1), Roster 2 (on 12/01, or Day 36), Roster 22 on (1/21, or Day 87), Roster 23 on (1/26, or Day 92), Roster 24 (on 1/31, or Day 97), and Roster 25 (on 02/04, or Day 101). They are in 3N518 in Rosters 1 and 2, then in 2S200 in Roster 22, in 2S210 in Roster 23, in 4N200 in Roster 24, and in 4N212 in Roster 25. 
+For a real example, consider SO Number P00069424 (node 10). This person is in Roster 1 (on 10/27, or Day 1), Roster 2 (on 12/01, or Day 36), Roster 22 on (1/21, or Day 87), Roster 23 on (1/26, or Day 92), Roster 24 (on 1/31, or Day 97), and Roster 25 (on 02/04, or Day 101). They are in 3N518 in Rosters 1 and 2, then in 2S200 in Roster 22, in 2S210 in Roster 23, in 4N200 in Roster 24, and in 4N212 in Roster 25.
 
-We thus consider them 'active' until Day 36 (inclusive) and from Day 87 on. We consider them to be 'in' 3N518 until Day 36 (inclusive), 'in' 2S200 on Day 87 only, 'in' 2S210 on Day 92 only, 'in' 4N200 on Day 97 only, and 'in' 4N212 on Day 101 only. This means that on Day 90, for example, node 10 is active but does not have an active location. 
+We thus consider them 'active' until Day 36 (inclusive) and from Day 87 on. We consider them to be 'in' 3N518 until Day 36 (inclusive), 'in' 2S200 on Day 87 only, 'in' 2S210 on Day 92 only, 'in' 4N200 on Day 97 only, and 'in' 4N212 on Day 101 only. This means that on Day 90, for example, node 10 is active but does not have an active location.
 
 ```{r, child = 'Sections/Step3-ActiveSpells.Rmd', include = FALSE}
 ```
@@ -89,22 +85,22 @@ We use the same approach that we used in Step 3 to create `bLocs`, which lists o
 
 In order to create a `networkDynamic` object for the cell-level network, we first need to manipulate `cEdges` a bit. We replace the column `lastTime` (the last day on which the edge is present) with `terminus` (the day *after* last day on which the edge is present, which is the day on which the edge should dissolve) and change the column name `startTime` to `onset` for consistency (it's the same column, though). We also change the `onset` value to `-Inf` for left-censored edges and the `terminus` value to `Inf` for right-censored edges (although this is probably unnecessary).
 
-We then need to create a static network that's the same size as the dynamic network we're going to create. This is very annoying because it makes the code much slower for some reason, but it seems to be the only way to specify that our network is not directed, which is important. 
+We then need to create a static network that's the same size as the dynamic network we're going to create. This is very annoying because it makes the code much slower for some reason, but it seems to be the only way to specify that our network is not directed, which is important.
 
-Then we're ready to create our cell-level `networkDynamic` object. We use the `cLocs` data frame we created in Step 3 to create a dynamic (TEA) node attribute called `location`. We also set age, race, and gender as (static) vertex attributes. (Each person's age is calculated as of the first day that they appear in the data. Some of the residents may have a birthday during the time period we're considering, but we ignore that.) Finally, we activate nodes based on the data in `activeDays`. 
+Then we're ready to create our cell-level `networkDynamic` object. We use the `cLocs` data frame we created in Step 3 to create a dynamic (TEA) node attribute called `location`. We also set age, race, and gender as (static) vertex attributes. (Each person's age is calculated as of the first day that they appear in the data. Some of the residents may have a birthday during the time period we're considering, but we ignore that.) Finally, we activate nodes based on the data in `activeDays`.
 
 ```{r, child = 'Sections/Step5-cDynNWObject.Rmd', include = FALSE}
 ```
 
 ## Step 6: Load a dynamic network object for block-level network
 
-We start by making the same changes to `bEdges` that we made to `cEdges` in Step 5. 
+We start by making the same changes to `bEdges` that we made to `cEdges` in Step 5.
 
 Because the block-level network is huge, it is impractical to create a block-level `networkDynamic` object here, so instead, we either load in a previously created object or create a series of static `network` objects.
 
 Currently, a block-level `networkDynamic` object (`bDynNW`) is only available for the 10/27 - 02/04 time frame. If that is the specified time frame of interest, we load in `bDynNW`, then set age, race, and gender as (static) vertex attributes and activate nodes based on `activeDays` as we did in Step 5 for the cell-level network. (Note that `bDynNW` also has a dynamic (TEA) node attribute called `location` created from `bLocs` that tells us what block the node is in when known/assumed.)
 
-If any other time frame has been specified, then we take the approach of creating a static `network` object for each time point for which we have a roster (using only the nodes and edges that are active at that time point). The nodes in these static networks have 4 attributes: age, race, gender, and floor.   
+If any other time frame has been specified, then we take the approach of creating a static `network` object for each time point for which we have a roster (using only the nodes and edges that are active at that time point). The nodes in these static networks have 4 attributes: age, race, gender, and floor.
 
 ```{r, child = 'Sections/Step6-bDynNWObject.Rmd', include = FALSE}
 ```
@@ -113,7 +109,7 @@ If any other time frame has been specified, then we take the approach of creatin
 
 To calculate the cell-level degree distribution over time, we extract the cell-level network at each time point for which we have a roster and use the `degreedist()` function on the extracted networks. We plot the degree distribution at a few selected time points. We also calculate the mean degree at each time point for which we have a roster and display these values in both a box plot and a scatter plot. In the box plot, each 'box' spans from the mean minus one standard deviation to the mean plus one standard deviation at that time point (with the lines spanning from minimum to maximum at each time point). Since the degree distributions are so right-skewed, the mean minus one standard deviation is often less than 0 (although of course no node has a degree less than 0).
 
-`cOverallMeanDeg` is a simple, un-weighted average of these mean degree values (each day is weighted equally, without regard for changing network size.) This represents how many cell-level edges the average resident has on the average day. 
+`cOverallMeanDeg` is a simple, un-weighted average of these mean degree values (each day is weighted equally, without regard for changing network size.) This represents how many cell-level edges the average resident has on the average day.
 
 ```{r, child = 'Sections/Step7-CellDegreeDist.Rmd', echo = FALSE, message = FALSE, warning = FALSE}
 ```
@@ -127,9 +123,9 @@ In Step 8, we perform the same operations as in Step 7, but broken down by race 
 
 ## Step 9: Calculate overall degree distribution for block-level network
 
-To calculate the block-level degree distribution over time, we adapt the same approach that we used in Step 7 when we calculated the cell-level degree distribution. 
+To calculate the block-level degree distribution over time, we adapt the same approach that we used in Step 7 when we calculated the cell-level degree distribution.
 
-`bOverallMeanDeg` is analogous to `cOverallMeanDeg`: a simple, un-weighted average of the (block-level) mean degree at each time point. It represents how many block-level edges the average resident has on the average day. 
+`bOverallMeanDeg` is analogous to `cOverallMeanDeg`: a simple, un-weighted average of the (block-level) mean degree at each time point. It represents how many block-level edges the average resident has on the average day.
 
 ```{r, child = 'Sections/Step9-BlockDegreeDist.Rmd', echo = FALSE, message = FALSE, warning = FALSE}
 ```
@@ -191,27 +187,25 @@ We then list out the number and percentage of residents that are long-term vs. s
 
 Additionally, we can look at the average duration of the cell-level location spells in `cLocs` and the block-level location spells in `bLocs`, broken down by location-spell censoring status (left- vs. right- vs. both- and not-censored) and by resident type (long-term vs. short-term vs. neither).
 
-_Also need to list out active spell locations_
-
 ```{r, child = 'Sections/Step14-LongVsShortStays.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning=FALSE}
 ```
 
 ## Step 15: Create animations of cell-level edges within a single block
 
-In the animations below, blue nodes represent Black residents, green nodes represent white residents, and red nodes represent residents of another race. Larger nodes represent older residents. An edge between two nodes represents two residents being housed in the same cell. A given resident is represented in the animation at time points when they are known (or assumed) to have been in the specified block. 
+In the animations below, blue nodes represent Black residents, green nodes represent white residents, and red nodes represent residents of another race. Larger nodes represent older residents. An edge between two nodes represents two residents being housed in the same cell. A given resident is represented in the animation at time points when they are known (or assumed) to have been in the specified block.
 
-Again, we take the general approach of assuming that if something is the same in two consecutive rosters, then it was also the same in the time between the two rosters. If an edge is present in one roster and not in the next, then it is assumed to have dissolved immediately after the date of the first roster; similarly, if a resident is in the specified block in one roster but not in the next, then they are assumed to have left immediately after the date of the first roster. 
+Again, we take the general approach of assuming that if something is the same in two consecutive rosters, then it was also the same in the time between the two rosters. If an edge is present in one roster and not in the next, then it is assumed to have dissolved immediately after the date of the first roster; similarly, if a resident is in the specified block in one roster but not in the next, then they are assumed to have left immediately after the date of the first roster.
 
 ```{r, child = 'Sections/Step15-Animations.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
 
 ## Step 16: Calculate and visualize age mixing matrix (for cell-level network)
 
-To analyze the age mixing in our cell-level network, we begin by creating a data frame, `doubledEdges`, that contains every edge in `cEdges` twice: once with the node with the smaller `id` as the head, and once with it as the tail. We then merge in the age (broken into 10-year categories) of the head and the tail of each edge. 
+To analyze the age mixing in our cell-level network, we begin by creating a data frame, `doubledEdges`, that contains every edge in `cEdges` twice: once with the node with the smaller `id` as the head, and once with it as the tail. We then merge in the age (broken into 10-year categories) of the head and the tail of each edge.
 
 We then analyze the age mixing on the first day and the last day of our timeframe of interest. For each time point, we count how many edges there are from each age category to each other age category (e.g., how many edges there are where the head is under 20 and the tail is under 20, how many where the head is under 20 and the tail is 20-29, etc.). We organize this information into a matrix, which will, by definition, be symmetrical (since, for example, every edge from a 20-29 year-old to a 30-39 year-old is also an edge from a 30-39 year-old to a 20-29 year-old.) For each category, we also calculate what proportion of edges from that category are to each other category (e.g., what proportion of edges with a head under 20 has a tail under 20, what proportion has a 20-29 year-old tail, etc.) We also organize this information into a matrix (which will not be symmetrical since the age categories are not evenly sized) with the rows (not the columns) summing to 1. All of this information is then presented in 4 contour plots.
 
-Finally, to see how the age mixing changed from the beginning to the end of our timeframe of interest, we subtract the initial age mixing matrix from the final one and present the result in a contour plot. We do this twice, once using numbers and once using proportions. 
+Finally, to see how the age mixing changed from the beginning to the end of our timeframe of interest, we subtract the initial age mixing matrix from the final one and present the result in a contour plot. We do this twice, once using numbers and once using proportions.
 
 ```{r, child = 'Sections/Step16-AgeMixing.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
