@@ -1,5 +1,5 @@
 ---
-title: "Step10-AgeMixing"
+title: "Step12-AgeMixing"
 author: "Karina Wallrafen-Sam"
 date: "4/12/2022"
 output: html_document

@@ -1,5 +1,5 @@
 ---
-title: "Step4-DegreeDist"
+title: "Step7-CellDegreeDist"
 author: "Karina Wallrafen-Sam"
 date: "4/1/2022"
 output: html_document

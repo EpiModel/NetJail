@@ -1,0 +1,293 @@
+---
+title: "Step16-Durations"
+author: "Karina Wallrafen-Sam"
+date: "4/1/2022"
+output: html_document
+---
+
+#### Average Duration of Cell-Level Location Spells 
+
+```{r}
+#CELL-LEVEL
+
+#Start with all available data (not just selected timeframe)
+#Subset to only men in standard locations
+data_m_full <- subset(all_data_full_tf, Gender == "M")
+m_stdLoc_full <- data_m_full[!grepl("[A-M]|[O-R]|[T-Z]|[a-z]", 
+                                    data_m_full$Location), ]
+loc3LD_full <- data_m_full[grepl("3LD", data_m_full$Location), ]
+m_stdLoc_full <- rbind(m_stdLoc_full, loc3LD_full)
+remove(loc3LD_full)
+
+#Create ids & calculate age
+cDailyLoc_full <- m_stdLoc_full %>% group_by(SoNum) %>% 
+  mutate(id = cur_group_id(), firstDate = min(Date)) %>% ungroup()
+cDailyLoc_full$InitialAge <- as.integer((cDailyLoc_full$firstDate - 
+                                           cDailyLoc_full$DOB)/365.25)
+
+#Assign numerical ids to each date from full timeframe
+dates_full <- unique(cDailyLoc_full[c("Date")])
+dates_full$DayIndex <- 1:nrow(dates_full)
+dates_full <- dates_full %>% 
+  mutate(DayNum = as.numeric(difftime(Date, lag(Date,1))))
+dates_full$DayNum[1] <- 1
+dates_full$DayNum <- cumsum(dates_full$DayNum)
+
+#Merge in date ids
+cLocs_full <- merge(cDailyLoc_full, dates_full, by = "Date")
+cLocs_full <- cLocs_full[with(cLocs_full, order(id, DayIndex)), ]
+
+#Identify rows where a new location spell starts
+ind <- which(cLocs_full$id==lag(cLocs_full$id) & 
+               cLocs_full$Location==lag(cLocs_full$Location) &
+               cLocs_full$DayIndex==(lag(cLocs_full$DayIndex) + 1))
+cLocs_full$newLoc <- "True"
+cLocs_full[ind, ]$newLoc <- "False"
+cLocs_full$locCounter <- cumsum(cLocs_full$newLoc == "True")
+cLocs_full$newLoc <- NULL
+remove(ind)
+
+#Find onset and terminus for each location spell 
+cLocs_full <- cLocs_full %>% group_by(locCounter) %>%
+  summarise(id = first(id), loc = first(Location), 
+            InitialAge = first(InitialAge), Race = first(Race), 
+            Gender = first(Gender), onset = min(DayNum),
+            terminus = max(DayNum) + 1)
+cLocs_full$locCounter <- NULL
+cLocs_full$startCensored <- "N"
+cLocs_full$startCensored[cLocs_full$onset == min(cLocs_full$onset) ] <- "Y"
+cLocs_full$endCensored <- "N"
+cLocs_full$endCensored[cLocs_full$terminus == max(cLocs_full$terminus) ] <- "Y"
+
+#Calculate duration of each location spell
+cLocs_full$duration <- cLocs_full$terminus - cLocs_full$onset
+
+#Find race, age group, and floor for each spell
+cLocs_full[cLocs_full$Race != "White" & 
+             cLocs_full$Race != "Black", ]$Race <- "Other"
+cLocs_full$InitialAge <- cut(cLocs_full$InitialAge, 
+                                breaks=c(0, 20, 30, 40, 50, 60, 100), 
+                                right = FALSE, 
+                                labels = c("Under 20", "20 - 29", "30 - 39", 
+                                           "40 - 49", "50 - 59", "60+"))
+cLocs_full$Floor <- substr(cLocs_full$loc, 0, 1)
+
+#Find mean location spell duration overall
+cLocDurations1 <- cLocs_full %>% group_by(startCensored, endCensored) %>% 
+  summarise(category = "Overall", meanDur = mean(duration), numSpells = n(),
+            .groups = "drop_last")
+
+#Find mean location spell duration by floor
+cLocDurations2 <- cLocs_full %>% 
+  group_by(startCensored, endCensored, Floor) %>% 
+  summarise(meanDur = mean(duration), numSpells = n(), .groups = "drop_last")
+cLocDurations2$Floor <- paste("Floor", cLocDurations2$Floor)
+names(cLocDurations2)[names(cLocDurations2) == 'Floor'] <- 'category'
+
+#Find mean location spell duration by race
+cLocDurations3 <- cLocs_full %>% 
+  group_by(startCensored, endCensored, Race) %>% 
+  summarise(meanDur = mean(duration), numSpells = n(), .groups = "drop_last")
+cLocDurations3$Race <- paste("Race", cLocDurations3$Race)
+names(cLocDurations3)[names(cLocDurations3) == 'Race'] <- 'category'
+
+#Find mean location spell duration by age category
+cLocDurations4 <- cLocs_full %>% 
+  group_by(startCensored, endCensored, InitialAge) %>% 
+  summarise(meanDur = mean(duration), numSpells = n(), .groups = "drop_last")
+cLocDurations4$InitialAge <- paste("Age", cLocDurations4$InitialAge)
+names(cLocDurations4)[names(cLocDurations4) == 'InitialAge'] <- 'category'
+
+#Combine and print
+cLocDurations <- rbind(cLocDurations1, cLocDurations2, cLocDurations3, 
+                           cLocDurations4)
+cLocDurations <- cLocDurations[with(cLocDurations, order(category)), ]
+cLocDurations <- cLocDurations %>% group_by(category) %>%
+  mutate(percentSpells = numSpells / sum(numSpells)) 
+#print(knitr::kable(cLocDurations[cLocDurations$category == 
+                                       #"Overall", ]))
+print(knitr::kable(cLocDurations))
+
+#Remove unneeded variables
+remove(cLocDurations1, cLocDurations2, cLocDurations3, cLocDurations4)
+```
+
+#### Average Duration of Block-Level Location Spells 
+
+```{r}
+#BLOCK-LEVEL
+
+#Create ids & calculate age & remove cell portion of location
+bDailyLoc_full <- m_stdLoc_full %>% group_by(SoNum) %>% 
+  mutate(id = cur_group_id(), firstDate = min(Date)) %>% ungroup()
+bDailyLoc_full$InitialAge <- as.integer((bDailyLoc_full$firstDate - 
+                                           bDailyLoc_full$DOB)/365.25)
+bDailyLoc_full$Location <- substr(bDailyLoc_full$Location, 0, 3)
+
+#Merge in date ids
+bLocs_full <- merge(bDailyLoc_full, dates_full, by = "Date")
+bLocs_full <- bLocs_full[with(bLocs_full, order(id, DayIndex)), ]
+
+#Identify rows where a new location spell starts
+ind <- which(bLocs_full$id==lag(bLocs_full$id) & 
+               bLocs_full$Location==lag(bLocs_full$Location) &
+               bLocs_full$DayIndex==(lag(bLocs_full$DayIndex) + 1))
+bLocs_full$newLoc <- "True"
+bLocs_full[ind, ]$newLoc <- "False"
+bLocs_full$locCounter <- cumsum(bLocs_full$newLoc == "True")
+bLocs_full$newLoc <- NULL
+remove(ind)
+
+#Find onset and terminus for each location spell 
+bLocs_full <- bLocs_full %>% group_by(locCounter) %>%
+  summarise(id = first(id), loc = first(Location), 
+            InitialAge = first(InitialAge), Race = first(Race), 
+            Gender = first(Gender), onset = min(DayNum),
+            terminus = max(DayNum) + 1)
+bLocs_full$locCounter <- NULL
+bLocs_full$startCensored <- "N"
+bLocs_full$startCensored[bLocs_full$onset == min(bLocs_full$onset) ] <- "Y"
+bLocs_full$endCensored <- "N"
+bLocs_full$endCensored[bLocs_full$terminus == max(bLocs_full$terminus) ] <- "Y"
+
+#Calculate duration of each location spell
+bLocs_full$duration <- bLocs_full$terminus - bLocs_full$onset
+
+#Find race, age group, and floor for each spell
+bLocs_full[bLocs_full$Race != "White" & 
+                bLocs_full$Race != "Black", ]$Race <- "Other"
+bLocs_full$InitialAge <- cut(bLocs_full$InitialAge, 
+                                breaks=c(0, 20, 30, 40, 50, 60, 100), 
+                                right = FALSE, 
+                                labels = c("Under 20", "20 - 29", "30 - 39", 
+                                           "40 - 49", "50 - 59", "60+"))
+bLocs_full$Floor <- substr(bLocs_full$loc, 0, 1)
+
+#Find mean location spell duration overall
+bLocDurations1 <- bLocs_full %>% group_by(startCensored, endCensored) %>% 
+  summarise(category = "Overall", meanDur = mean(duration), numSpells = n(),
+            .groups = "drop_last")
+
+#Find mean location spell duration by floor
+bLocDurations2 <- bLocs_full %>% 
+  group_by(startCensored, endCensored, Floor) %>% 
+  summarise(meanDur = mean(duration), numSpells = n(), .groups = "drop_last")
+bLocDurations2$Floor <- paste("Floor", bLocDurations2$Floor)
+names(bLocDurations2)[names(bLocDurations2) == 'Floor'] <- 'category'
+
+#Find mean location spell duration by race
+bLocDurations3 <- bLocs_full %>% 
+  group_by(startCensored, endCensored, Race) %>% 
+  summarise(meanDur = mean(duration), numSpells = n(), .groups = "drop_last")
+bLocDurations3$Race <- paste("Race", bLocDurations3$Race)
+names(bLocDurations3)[names(bLocDurations3) == 'Race'] <- 'category'
+
+#Find mean location spell duration by age category
+bLocDurations4 <- bLocs_full %>% 
+  group_by(startCensored, endCensored, InitialAge) %>% 
+  summarise(meanDur = mean(duration), numSpells = n(), .groups = "drop_last")
+bLocDurations4$InitialAge <- paste("Age", bLocDurations4$InitialAge)
+names(bLocDurations4)[names(bLocDurations4) == 'InitialAge'] <- 'category'
+
+#Combine and print
+bLocDurations <- rbind(bLocDurations1, bLocDurations2, bLocDurations3, 
+                           bLocDurations4)
+bLocDurations <- bLocDurations[with(bLocDurations, order(category)), ]
+bLocDurations <- bLocDurations %>% group_by(category) %>%
+  mutate(percentSpells = numSpells / sum(numSpells)) 
+#print(knitr::kable(bLocDurations[bLocDurations$category == "Overall", ]))
+print(knitr::kable(bLocDurations))
+
+#Remove unneeded variables
+remove(bLocDurations1, bLocDurations2, bLocDurations3, bLocDurations4)
+```
+
+#### Average Duration of Spells of Activity
+
+```{r}
+#JAIL-LEVEL
+
+#Calculate active spell durations
+durations <- merge(cDailyLoc_full, dates_full, by = "Date")
+durations <- durations[with(durations, order(id, DayIndex)), ]
+ind <- which(durations$id==lag(durations$id) &
+               durations$DayIndex == (lag(durations$DayIndex) + 1))
+durations$newStay <- "True"
+durations[ind, ]$newStay <- "False"
+durations$stayCounter <- cumsum(durations$newStay == "True")
+durations$newStay <- NULL
+ind2 <- which(durations$stayCounter==lag(durations$stayCounter) &
+                durations$Location==lag(durations$Location))
+durations$newLoc <- "True"
+durations[ind2, ]$newLoc <- "False"
+durations$locCounter <- cumsum(durations$newLoc == "True")
+durations$newLoc <- NULL
+remove(ind, ind2)
+durations <- durations %>% group_by(stayCounter) %>%
+  summarise(id = first(id), InitialAge = first(InitialAge), Race = first(Race), 
+            Gender = first(Gender), firstDay = min(DayNum), 
+            lastDay = max(DayNum), numLocs = n_distinct(locCounter))
+durations$stayCounter <- NULL
+durations$duration <- durations$lastDay - durations$firstDay + 1
+durations$startCensored <- "N"
+durations$startCensored[durations$firstDay == min(durations$firstDay) ] <- "Y"
+durations$endCensored <- "N"
+durations$endCensored[durations$lastDay == max(durations$lastDay) ] <- "Y"
+
+#Clean up nodal attributes
+durations[durations$Race != "White" & durations$Race != "Black", ]$Race <- 
+  "Other"
+durations$InitialAge <- cut(durations$InitialAge, 
+                            breaks=c(0, 20, 30, 40, 50, 60, 100), 
+                            right = FALSE, labels = c("Under 20", "20 - 29", 
+                                                      "30 - 39", "40 - 49", 
+                                                      "50 - 59", "60+"))
+durations <- merge(durations, dates_full[, c("Date", "DayNum")], 
+                   by.x = "firstDay", by.y = "DayNum")
+durations <- merge(durations, cDailyLoc_full, by = c("id", "Date"))
+durations$InitialFloor <- substr(durations$Location, 0, 1)
+
+#Find mean active spell duration overall
+durations1 <- durations %>% group_by(startCensored, endCensored) %>%
+  summarise(category = "Overall", meanDur = mean(duration), numSpells = n(), 
+            meanNumLocs = mean(numLocs), .groups = "drop_last")
+
+#Find mean active spell duration by floor
+durations2 <- durations %>% 
+  group_by(startCensored, endCensored, InitialFloor) %>% 
+  summarise(meanDur = mean(duration), numSpells = n(), 
+            meanNumLocs = mean(numLocs), .groups = "drop_last")
+durations2$InitialFloor <- paste("Floor", durations2$InitialFloor)
+names(durations2)[names(durations2) == "InitialFloor"] <- 'category'
+
+#Find mean active spell duration by race
+durations3 <- durations %>% group_by(startCensored, endCensored, Race.x) %>% 
+  summarise(meanDur = mean(duration), numSpells = n(), 
+            meanNumLocs = mean(numLocs), .groups = "drop_last")
+durations3$Race.x <- paste("Race", durations3$Race.x)
+names(durations3)[names(durations3) == 'Race.x'] <- 'category'
+
+#Find mean active spell duration by age
+durations4 <- durations %>% 
+  group_by(startCensored, endCensored, InitialAge.x) %>% 
+  summarise(meanDur = mean(duration), numSpells = n(), 
+            meanNumLocs = mean(numLocs), .groups = "drop_last")
+durations4$InitialAge.x <- paste("Age", durations4$InitialAge.x)
+names(durations4)[names(durations4) == 'InitialAge.x'] <- 'category'
+
+#Combine and print
+durationsSummary <- rbind(durations1, durations2, durations3, durations4)
+durationsSummary <- durationsSummary[with(durationsSummary, order(category)),]
+durationsSummary <- durationsSummary %>% group_by(category) %>%
+  mutate(percentSpells = round(numSpells / sum(numSpells), 4) * 100) 
+durationsSummary$meanDur <- round(durationsSummary$meanDur, 2)
+durationsSummary$meanNumLocs <- round(durationsSummary$meanNumLocs, 2)
+#print(knitr::kable(durationsSummary[durationsSummary$category == "Overall",
+                                    #c("startCensored", "endCensored", "category", 
+                                      #"meanDur", "meanNumLocs", 
+                                      #"percentSpells")]))
+print(knitr::kable(durationsSummary))
+
+#Remove unneeded variables
+remove(durations1, durations2, durations3, durations4)
+```

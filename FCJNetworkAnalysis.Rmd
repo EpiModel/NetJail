@@ -20,19 +20,17 @@ firstDay <- as.Date("2022-01-11")
 lastDay <- as.Date("2022-04-11")
 
 days <- c(1, 6, 11, 15, 20, 25) #Day indices for degree dist plots -- ideally 6
-
-EstimateLocDurations <- TRUE #If T, calculate avg time spent in a block/cell
-EstimateDurations <- TRUE #If T, calculate avg time spent in jail
-AnalyseShortVsLong <- TRUE #If T, consider short vs long-term residents
 ```
 
-### All analyses below use data from `r as.character(firstDay)` to `r as.character(lastDay)`.
+### Steps 0 through 15 below use data from `r as.character(firstDay)` to `r as.character(lastDay)`.
 
 ## Step 0: Load in data and conduct initial processing/cleaning
 
-We start by loading all excel files from the data/input/FJC folder into a single large data frame, `all_data`. This folder currently contains rosters from 10/27/21 to 04/11/22. Although some of the excel files include their data split into multiple sheets (one for each floor/tower), all of them start with the full roster in a single sheet, so we disregard the extra sheets.
+We start by loading all excel files from the data/input/FJC folder into a single large data frame, `all_data`. Although some of the excel files include their data split into multiple sheets (one for each floor/tower), all of them start with the full roster in a single sheet, so we disregard the extra sheets.
 
-When we check for the uniqueness of the SO Numbers (considering all rosters from 10/27 to 04/11), we see that 11 SO Numbers are associated with multiple DOBs and 3 with multiple Races. For these SO Numbers, we consider the DOB/Race from the most recent roster to be the 'truth'. Also, SO Number P01007978 has Gender = “M” from 10/27/2021 to 01/31/2022 and Gender = “F” from 02/04/2022 to 04/11/22. Since this person is always located in parts of the jail that house male residents, we will consider Gender = "M" to be the 'truth'. We adjust the data accordingly for these 15 residents. We then remove any data that falls outside of our specified timeframe of interest.
+When we check for the uniqueness of the SO Numbers, we see that a small number of SO Numbers are associated with multiple DOBs and or with multiple Races. For these SO Numbers, we consider the DOB/Race from the most recent roster to be the 'truth'. Also, SO Number P01007978 has Gender = “M” from 10/27/2021 to 01/31/2022 and Gender = “F” from 02/04/2022 onward. Since this person is always located in parts of the jail that house male residents, we will consider Gender = "M" to be the 'truth'. We adjust the data accordingly for these residents. 
+
+We then remove any data that falls outside of our specified timeframe of interest -- in this case, `r as.character(firstDay)` to `r as.character(lastDay)`.
 
 Then we subset out all data rows that contain female residents and/or locations that do not follow the Floor + Tower + Block + Cell pattern. (This data is placed into two data frames, `data_f` and `m_specialLoc`, which will not be used going forward.) This means that we exclude all data rows for the South Annex, the Marietta Annex, Central Holding, Central Release, Intake, Medical Holding, Weekenders, and In Transit Cells (since these locations are separate from the main jail and essentially have their own smaller networks). Data rows for male residents with locations that begin with 3LD (e.g., 3LD60) are included since these locations are on the third floor of the main jail. For these locations, we consider the floor to be 3, the tower to be L, and the block to be D. (Data rows for female residents in locations that begin with 3LD are NOT included.)
 
@@ -137,7 +135,27 @@ In Step 10, we perform the same operations as in Step 9, but broken down by race
 ```{r, child = 'Sections/Step10-BlockDegreeDistByAttr.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
 
-## Step 11: Estimate rate of cell changes within jail
+## Step 11: Create animations of cell-level edges within a single block
+
+In the animations below, blue nodes represent Black residents, green nodes represent white residents, and red nodes represent residents of another race. Larger nodes represent older residents. An edge between two nodes represents two residents being housed in the same cell. A given resident is represented in the animation at time points when they are known (or assumed) to have been in the specified block.
+
+Again, we take the general approach of assuming that if something is the same in two consecutive rosters, then it was also the same in the time between the two rosters. If an edge is present in one roster and not in the next, then it is assumed to have dissolved immediately after the date of the first roster; similarly, if a resident is in the specified block in one roster but not in the next, then they are assumed to have left immediately after the date of the first roster.
+
+```{r, child = 'Sections/Step11-Animations.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```
+
+## Step 12: Calculate and visualize age mixing matrix (for cell-level network)
+
+To analyze the age mixing in our cell-level network, we begin by creating a data frame, `doubledEdges`, that contains every edge in `cEdges` twice: once with the node with the smaller `id` as the head, and once with it as the tail. We then merge in the age (broken into 10-year categories) of the head and the tail of each edge.
+
+We then analyze the age mixing on the first day and the last day of our timeframe of interest. For each time point, we count how many edges there are from each age category to each other age category (e.g., how many edges there are where the head is under 20 and the tail is under 20, how many where the head is under 20 and the tail is 20-29, etc.). We organize this information into a matrix, which will, by definition, be symmetrical (since, for example, every edge from a 20-29 year-old to a 30-39 year-old is also an edge from a 30-39 year-old to a 20-29 year-old.) For each category, we also calculate what proportion of edges from that category are to each other category (e.g., what proportion of edges with a head under 20 has a tail under 20, what proportion has a 20-29 year-old tail, etc.) We also organize this information into a matrix (which will not be symmetrical since the age categories are not evenly sized) with the rows (not the columns) summing to 1. All of this information is then presented in 4 contour plots.
+
+Finally, to see how the age mixing changed from the beginning to the end of our timeframe of interest, we subtract the initial age mixing matrix from the final one and present the result in a contour plot. We do this twice, once using numbers and once using proportions.
+
+```{r, child = 'Sections/Step12-AgeMixing.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```
+
+## Step 13: Estimate rate of cell changes within jail
 
 We begin by counting up the number of times that a location spell (in `cLocs`) ends without its corresponding activity spells (in `activeDays`) also ending. This represents the total number of times we believe that someone left their cell (and moved to a new one) without leaving the jail. We divide this number by the average active population size and divide again by the number of days in our timeframe of interest for scaling purposes. This gives us an estimate of the number of cell changes per person per day. This approach is better suited to timeframes in which we have daily data, without gaps.
 
@@ -147,39 +165,43 @@ We also perform all of the above calculations broken down by race, age, and floo
 
 Finally, we create a matrix showing how many cell changes were from Floor i to Floor j (for i,j = 1, 2, ..., 7). (In this matrix, the rows are for the cell that the person moved FROM and the columns are for the cell that the person moved TO.)
 
-Additionally, we can look at the average duration of the location spells in `cLocs`, broken down by censoring status (i.e., left-censored vs. right-censored vs. censored on both sides vs. not censored) and by attribute. This approach is better suited to longer timeframes. The column `percentSpells` indicates what percent of location spells for that particular attribute (e.g., Floor 7) have that censoring status.
-
-
-```{r, child = 'Sections/Step11-CellTurnover.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```{r, child = 'Sections/Step13-CellTurnover.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
 
-## Step 12: Estimate rate of block changes within jail
+## Step 14: Estimate rate of block changes within jail
 
 We use the same approach that we used in Step 11 to now estimate the number of block changes per person per day. Again, this analysis is better suited to timeframes in which we have daily data, without gaps. We  perform these calculations overall and broken down by race, age, and floor (i.e., the floor of the block that is vacated).
 
-Additionally, we can look at the average duration of the location spells in `bLocs`, broken down by censoring status (i.e., left-censored vs. right-censored vs. censored on both sides vs. not censored) and by attribute. Again, this approach is better suited to longer timeframes.
-
-```{r, child = 'Sections/Step12-BlockTurnover.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```{r, child = 'Sections/Step14-BlockTurnover.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
 ```
 
-## Step 13: Estimate Turnover Rates
+## Step 15: Estimate rate of releases from jail
 
 In this section, we calculate turnover rates (into and out of the jail) overall and by attribute. We attempt to adapt the DOJ's definition of "weekly turnover rate" ("The sum of weekly admissions and releases divided by the average daily population") since we do not have consistent weekly data. Instead, we calculate the following:
 
-We add up the known admissions (i.e., the number of spells of activity, as defined in Step 3, that are not left-censored) and the known releases (i.e., the number of spells of activity, as defined in Step 3, that are not right-censored). These numbers include repeat admissions and releases. We calculate `TurnoverIn` by dividing the number of admissions by the average active network size (i.e., the average number of residents in the jail across the days for which we have data). Similarly, we calculate `TurnoverOut` by dividing the number of releases by the average active network size. Note that the numerators may be significantly underestimated if there are data gaps within the selected timeframe. For scaling purposes, we divide `TurnoverIn` and `TurnoverOut` by the number of days in our timeframe. These numbers represent, roughly, an (under)estimate of the number of daily admissions and releases, respectively, per resident. This approach is better suited to timeframes in which we have daily data, without gaps.
+We add up the known admissions (i.e., the number of spells of activity, as defined in Step 3, that are not left-censored) and the known releases (i.e., the number of spells of activity, as defined in Step 3, that are not right-censored). These numbers include repeat admissions and releases. We calculate `TurnoverIn` by dividing the number of admissions by the average active network size (i.e., the average number of residents in the jail across the days in our timeframe of interest). Similarly, we calculate `TurnoverOut` by dividing the number of releases by the average active network size. Note that the numerators may be significantly underestimated if there are data gaps within the selected timeframe. For scaling purposes, we divide `TurnoverIn` and `TurnoverOut` by the number of days in our timeframe. These numbers represent, roughly, an (under)estimate of the number of daily admissions and releases, respectively, per resident. This approach is better suited to timeframes in which we have daily data, without gaps.
 
 We perform the above calculations overall and broken down by age, race, and floor. The calculations by age and race are a matter of straightforward subsetting (since age and race are static attributes); the calculations by floor are a little more involved. (For every non-left-censored spell of activity (i.e., admission), we check what floor the resident was in on the first day in that spell. We consider this the floor that they were admitted to. Similarly, for every non-right-censored spell of activity (i.e., release), we check what floor the resident was in on the last day in that spell. We consider this the floor that they were released from. Then we can count up the admissions and releases by floor.)
 
-Additionally, we can also look at the average duration of an active spell and the average number of locations per active spell. This approach is better suited to longer timeframes. We break these statistics down by censoring status (looking at spells of activity that are neither right- nor left-censored vs. spells that are right-censored only vs. spells that are left-censored only vs. spells that are censored on both sides). By definition, the average duration for spells that are censored on both sides is the number of days in the selected timeframe.
-
-Specifically, if we look at 10/27 to 02/04, then both-censored spells are 101 days long by definition, and uncensored spells must, by definition, have started on or after 12/01 and ended on or before 01/31, meaning that they can be at most 62 days long. These short-term uncensored spells are about 11 days long on average. Interestingly, there is no obvious relationship between censoring category and the average number of locations per spell, suggesting that short-term residents move locations within the jail more frequently. As in Step 11, the column `percentSpells` indicates what percent of activity spells for that particular attribute (e.g., Floor 7) have that censoring status. Looking at this column, we can see that both-censored spells of activity are more common on higher floors and among younger residents.
-
-```{r, child = 'Sections/Step13-JailTurnover.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning=FALSE}
+```{r, child = 'Sections/Step15-JailTurnover.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning=FALSE}
 ```
 
-## Step 14: Consider long- vs. short-term residents
+### Steps 16 through 17 below use data from `r as.character(minDay)` to `r as.character(maxDay)`.
 
-This step is better suited to longer timeframes.
+## Step 16: Estimate average time spent in a cell/block/jail
+
+In addition to calculating cell-level, block-level, and jail-level turnover rates (in Steps 13 - 15), we can look at the average duration of cell-location spells, of  block-level location spells, and of active spells, broken down by censoring status (i.e., left-censored vs. right-censored vs. censored on both sides vs. not censored) and by attribute. Since this analysis is better suited to longer timeframes, we use all of the available rosters for this step (not just those that fall within our timeframe of interest). By definition, the average duration for spells that are censored on both sides is the number of days between the first and last roster (inclusive). Uncensored spells must begin on or after the second roster and end on or before the second-to-last roster.
+
+Note that in the tables below, the column `percentSpells` indicates what percent of location/active spells for that particular attribute (e.g., Floor 7) have that censoring status.
+
+When we look at the average duration of an active spell, we can also look at the average number of locations per active spell. Interestingly, there is no obvious relationship between censoring category and the average number of locations per spell, suggesting that short-term residents move locations within the jail more frequently. Looking at the `percentSpells` column, we can see that both-censored spells of activity are more common on higher floors and among younger residents.
+
+```{r, child = 'Sections/Step16-Durations.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning=FALSE}
+```
+
+## Step 17: Consider long- vs. short-term residents
+
+This step is better suited to longer timeframes, so again, we use all of the available rosters for this step.
 
 We consider residents to be 'long-term' if they have a single spell of activity that is censored on both sides (i.e., they are in every roster). We consider residents to be 'short-term' if they have at least one spell of activity that is uncensored (even if they have another censored spell of activity). (Note that some people are not classified as either).
 
@@ -187,25 +209,5 @@ We then list out the number and percentage of residents that are long-term vs. s
 
 Additionally, we can look at the average duration of the cell-level location spells in `cLocs` and the block-level location spells in `bLocs`, broken down by location-spell censoring status (left- vs. right- vs. both- and not-censored) and by resident type (long-term vs. short-term vs. neither).
 
-```{r, child = 'Sections/Step14-LongVsShortStays.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning=FALSE}
-```
-
-## Step 15: Create animations of cell-level edges within a single block
-
-In the animations below, blue nodes represent Black residents, green nodes represent white residents, and red nodes represent residents of another race. Larger nodes represent older residents. An edge between two nodes represents two residents being housed in the same cell. A given resident is represented in the animation at time points when they are known (or assumed) to have been in the specified block.
-
-Again, we take the general approach of assuming that if something is the same in two consecutive rosters, then it was also the same in the time between the two rosters. If an edge is present in one roster and not in the next, then it is assumed to have dissolved immediately after the date of the first roster; similarly, if a resident is in the specified block in one roster but not in the next, then they are assumed to have left immediately after the date of the first roster.
-
-```{r, child = 'Sections/Step15-Animations.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
-```
-
-## Step 16: Calculate and visualize age mixing matrix (for cell-level network)
-
-To analyze the age mixing in our cell-level network, we begin by creating a data frame, `doubledEdges`, that contains every edge in `cEdges` twice: once with the node with the smaller `id` as the head, and once with it as the tail. We then merge in the age (broken into 10-year categories) of the head and the tail of each edge.
-
-We then analyze the age mixing on the first day and the last day of our timeframe of interest. For each time point, we count how many edges there are from each age category to each other age category (e.g., how many edges there are where the head is under 20 and the tail is under 20, how many where the head is under 20 and the tail is 20-29, etc.). We organize this information into a matrix, which will, by definition, be symmetrical (since, for example, every edge from a 20-29 year-old to a 30-39 year-old is also an edge from a 30-39 year-old to a 20-29 year-old.) For each category, we also calculate what proportion of edges from that category are to each other category (e.g., what proportion of edges with a head under 20 has a tail under 20, what proportion has a 20-29 year-old tail, etc.) We also organize this information into a matrix (which will not be symmetrical since the age categories are not evenly sized) with the rows (not the columns) summing to 1. All of this information is then presented in 4 contour plots.
-
-Finally, to see how the age mixing changed from the beginning to the end of our timeframe of interest, we subtract the initial age mixing matrix from the final one and present the result in a contour plot. We do this twice, once using numbers and once using proportions.
-
-```{r, child = 'Sections/Step16-AgeMixing.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning = FALSE}
+```{r, child = 'Sections/Step17-LongVsShortStays.Rmd', results = 'asis', echo = FALSE, message = FALSE, warning=FALSE}
 ```

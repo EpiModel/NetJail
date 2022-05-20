@@ -62,13 +62,16 @@ timeGaps <- timeGaps %>% group_by(Date) %>% mutate(Day = cur_group_id()) %>%
 timeGaps <- which(timeGaps$SoNum==lag(timeGaps$SoNum) &
                     timeGaps$Day != (lag(timeGaps$Day) + 1))
 
-#Subset only to the time frame of interest
-all_data <- all_data[all_data$Date >= firstDay & all_data$Date <= lastDay, ]
-
 #Remove extra designations from location column
 all_data$Location <- gsub(" - Male", "", all_data$Location)
 all_data$Location <- gsub(" - Female", "", all_data$Location)
 all_data$Location <- gsub(" - Padded Cell", "", all_data$Location)
+
+#Subset only to the time frame of interest
+all_data_full_tf <- all_data
+minDay <- min(all_data_full_tf$Date)
+maxDay <- max(all_data_full_tf$Date)
+all_data <- all_data[all_data$Date >= firstDay & all_data$Date <= lastDay, ]
 
 #Separate men from women and standard from special locations
 data_m <- subset(all_data, Gender == "M")

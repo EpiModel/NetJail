@@ -1,5 +1,5 @@
 ---
-title: "Step6-CellTurnover"
+title: "Step13-CellTurnover"
 author: "Karina Wallrafen-Sam"
 date: "4/1/2022"
 output: html_document
@@ -157,57 +157,4 @@ cellChangesByFloor <- locChanges2 %>% group_by(Floor, nextFloor) %>%
 cellChangesByFloor.mat <- cellChangesByFloor %>% 
   pivot_wider(names_from = nextFloor, values_from = numChanges)
 knitr::kable(cellChangesByFloor.mat)
-
-#Another approach to estimating avg. duration in a particular location...
-if (EstimateLocDurations == TRUE) {
-  locDurations <- cLocs
-  locDurations$startCensored <- "N"
-  locDurations$startCensored[locDurations$onset == -Inf ] <- "Y"
-  locDurations$endCensored <- "N"
-  locDurations$endCensored[locDurations$terminus == Inf ] <- "Y"
-  locDurations$onset[locDurations$onset == -Inf] <- 1
-  locDurations$terminus[locDurations$terminus == Inf] <- max(dates$DayNum) + 1
-  locDurations$duration <- locDurations$terminus - locDurations$onset
-  locDurations <- merge(locDurations, ids[ , c("id", "Race", "InitialAge")], 
-                        by = "id")
-  locDurations[locDurations$Race != "White" & 
-                 locDurations$Race != "Black", ]$Race <- "Other"
-  locDurations$InitialAge <- cut(locDurations$InitialAge, 
-                                 breaks=c(0, 20, 30, 40, 50, 60, 100), 
-                                 right = FALSE, 
-                                 labels = c("Under 20", "20 - 29", "30 - 39", 
-                                            "40 - 49", "50 - 59", "60+"))
-  locDurations$Floor <- substr(locDurations$loc, 0, 1)
-  
-  locDurations1 <- locDurations %>% group_by(startCensored, endCensored) %>% 
-    summarise(category = "Overall", meanDur = mean(duration), numSpells = n(),
-              .groups = "drop_last")
-  
-  locDurations2 <- locDurations %>% 
-    group_by(startCensored, endCensored, Floor) %>% 
-    summarise(meanDur = mean(duration), numSpells = n(), .groups = "drop_last")
-  locDurations2$Floor <- paste("Floor", locDurations2$Floor)
-  names(locDurations2)[names(locDurations2) == 'Floor'] <- 'category'
-  
-  locDurations3 <- locDurations %>% 
-    group_by(startCensored, endCensored, Race) %>% 
-    summarise(meanDur = mean(duration), numSpells = n(), .groups = "drop_last")
-  locDurations3$Race <- paste("Race", locDurations3$Race)
-  names(locDurations3)[names(locDurations3) == 'Race'] <- 'category'
-  
-  locDurations4 <- locDurations %>% 
-    group_by(startCensored, endCensored, InitialAge) %>% 
-    summarise(meanDur = mean(duration), numSpells = n(), .groups = "drop_last")
-  locDurations4$InitialAge <- paste("Age", locDurations4$InitialAge)
-  names(locDurations4)[names(locDurations4) == 'InitialAge'] <- 'category'
-  
-  cLocDurations <- rbind(locDurations1, locDurations2, locDurations3, 
-                        locDurations4)
-  cLocDurations <- cLocDurations[with(cLocDurations, order(category)), ]
-  cLocDurations <- cLocDurations %>% group_by(category) %>%
-    mutate(percentSpells = numSpells / sum(numSpells)) 
-  print(knitr::kable(cLocDurations[cLocDurations$category == "Overall", ]))
-  
-  remove(locDurations1, locDurations2, locDurations3, locDurations4)
-}
 ```
