@@ -102,5 +102,5 @@ turnover_rates$TurnoverIn <- (turnover_rates$Admissions /
                                 turnover_rates$AveragePop) / max(dates$DayNum) 
 turnover_rates$TurnoverOut <- (turnover_rates$Releases / 
                                 turnover_rates$AveragePop) / max(dates$DayNum) 
-knitr::kable(turnover_rates[ ,c("Category", "TurnoverOut")])
+knitr::kable(turnover_rates[ ,c("Category", "TurnoverOut")], digits = 3)
 ```

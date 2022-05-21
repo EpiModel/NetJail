@@ -64,9 +64,9 @@ typesSummary <- typesSummary %>% group_by(category) %>%
 typesSummary <- typesSummary[,c(2,1,3,4)]
 typesSummary <- typesSummary[complete.cases(typesSummary), ]
 
-print(knitr::kable(typesSummary[c(1:2, 21:nrow(typesSummary)), ], 
-                   caption = "# of long-term vs. short-term residents 
-                     (overall and by floor)"))
+knitr::kable(typesSummary[c(1:2, 21:nrow(typesSummary)), ], 
+             caption = "# of long-term vs. short-term residents (overall and 
+             by floor)")
 
 #Estimate average active spell duration for long vs short term
 durations <- merge(durations, ids_full[ , c("id", "type")], by = "id")
@@ -76,7 +76,7 @@ meanDurST <- mean(durations[durations$type %in% c("Short-Term"), ]$duration)
 
 ##### The mean active spell duration for long-term residents is `r meanDurLT` days (by definition).
 
-##### The mean active spell duration for short-term residents is `r meanDurST` days.
+##### The mean active spell duration for short-term residents is `r round(meanDurST, digits = 3)` days.
 
 ```{r}  
 #Estimate average duration of cell location spell for long vs short term
@@ -92,10 +92,9 @@ cLocDurations2$category <- cLocDurations2$category %>% replace_na('Neither')
 
 cLocDurations2 <- cLocDurations2[with(cLocDurations2, order(category)), ]
 cLocDurations2 <- cLocDurations2 %>% group_by(category) %>%
-  mutate(percentSpells = numSpells / sum(numSpells)) 
-print(knitr::kable(cLocDurations2, 
-                   caption = "Mean duration of cell-level location spells 
-                     for long- vs. short-term residents"))
+  mutate(percentSpells = round(numSpells / sum(numSpells), 4) * 100) 
+knitr::kable(cLocDurations2, digits = 3, caption = "Mean duration of cell-level 
+             location spells for long- vs. short-term residents")
 
 #Estimate average duration of block location spell for long vs short term
 bLocs_full <- merge(bLocs_full, ids_full[ , c("id", "type")], 
@@ -111,8 +110,8 @@ bLocDurations2$category <- bLocDurations2$category %>% replace_na('Neither')
 
 bLocDurations2 <- bLocDurations2[with(bLocDurations2, order(category)), ]
 bLocDurations2 <- bLocDurations2 %>% group_by(category) %>%
-  mutate(percentSpells = numSpells / sum(numSpells)) 
-print(knitr::kable(bLocDurations2, 
-                   caption = "Mean duration of block-level location spells 
-                     for long- vs. short-term residents"))
+  mutate(percentSpells = round(numSpells / sum(numSpells), 4) * 100) 
+knitr::kable(bLocDurations2, digits = 3, 
+             caption = "Mean duration of block-level location spells for long- 
+             vs. short-term residents")
 ```

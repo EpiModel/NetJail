@@ -148,7 +148,7 @@ cell_changes$PercentWInBlock <-
   round(as.numeric(cell_changes$ChangesWInBlock) / 
           as.numeric(cell_changes$LocChanges) * 100, 2)
 knitr::kable(cell_changes[ ,c("Category", "CellChangeRate", "PercentWInFloor", 
-                              "PercentWInBlock")])
+                              "PercentWInBlock")], digits = 3)
 
 #Floor change matrix
 locChanges2$nextFloor <- substr(locChanges2$nextLoc, 1, 2)

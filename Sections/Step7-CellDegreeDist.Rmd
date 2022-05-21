@@ -64,4 +64,4 @@ plot(x = cMeanDeg$dates.Date, y = cMeanDeg$cMeanDeg,
 cOverallMeanDeg <- mean(cMeanDeg$cMeanDeg)
 ```
 
-##### The cell-level mean degree averaged across the days from `r firstDay` to `r lastDay` is `r round(cOverallMeanDeg, digits = 4)` edges per node.
+##### The cell-level mean degree averaged across the days from `r firstDay` to `r lastDay` is `r round(cOverallMeanDeg, digits = 3)` edges per node.

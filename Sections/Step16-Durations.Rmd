@@ -103,10 +103,8 @@ cLocDurations <- rbind(cLocDurations1, cLocDurations2, cLocDurations3,
                            cLocDurations4)
 cLocDurations <- cLocDurations[with(cLocDurations, order(category)), ]
 cLocDurations <- cLocDurations %>% group_by(category) %>%
-  mutate(percentSpells = numSpells / sum(numSpells)) 
-#print(knitr::kable(cLocDurations[cLocDurations$category == 
-                                       #"Overall", ]))
-print(knitr::kable(cLocDurations))
+  mutate(percentSpells = round(numSpells / sum(numSpells), 4) * 100) 
+knitr::kable(cLocDurations[cLocDurations$category == "Overall", ], digits = 3)
 
 #Remove unneeded variables
 remove(cLocDurations1, cLocDurations2, cLocDurations3, cLocDurations4)
@@ -194,9 +192,8 @@ bLocDurations <- rbind(bLocDurations1, bLocDurations2, bLocDurations3,
                            bLocDurations4)
 bLocDurations <- bLocDurations[with(bLocDurations, order(category)), ]
 bLocDurations <- bLocDurations %>% group_by(category) %>%
-  mutate(percentSpells = numSpells / sum(numSpells)) 
-#print(knitr::kable(bLocDurations[bLocDurations$category == "Overall", ]))
-print(knitr::kable(bLocDurations))
+  mutate(percentSpells = round(numSpells / sum(numSpells), 4) * 100) 
+knitr::kable(bLocDurations[bLocDurations$category == "Overall", ], digits = 3)
 
 #Remove unneeded variables
 remove(bLocDurations1, bLocDurations2, bLocDurations3, bLocDurations4)
@@ -280,13 +277,10 @@ durationsSummary <- rbind(durations1, durations2, durations3, durations4)
 durationsSummary <- durationsSummary[with(durationsSummary, order(category)),]
 durationsSummary <- durationsSummary %>% group_by(category) %>%
   mutate(percentSpells = round(numSpells / sum(numSpells), 4) * 100) 
-durationsSummary$meanDur <- round(durationsSummary$meanDur, 2)
-durationsSummary$meanNumLocs <- round(durationsSummary$meanNumLocs, 2)
-#print(knitr::kable(durationsSummary[durationsSummary$category == "Overall",
-                                    #c("startCensored", "endCensored", "category", 
-                                      #"meanDur", "meanNumLocs", 
-                                      #"percentSpells")]))
-print(knitr::kable(durationsSummary))
+knitr::kable(durationsSummary[durationsSummary$category == "Overall",
+                                    c("startCensored", "endCensored", "category", 
+                                      "meanDur", "meanNumLocs", 
+                                      "percentSpells")], digits = 3)
 
 #Remove unneeded variables
 remove(durations1, durations2, durations3, durations4)
