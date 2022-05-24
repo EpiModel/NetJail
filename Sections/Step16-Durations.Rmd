@@ -19,7 +19,7 @@ loc3LD_full <- data_m_full[grepl("3LD", data_m_full$Location), ]
 m_stdLoc_full <- rbind(m_stdLoc_full, loc3LD_full)
 remove(loc3LD_full)
 
-#Create ids & calculate age
+#Create ids & calculate age 
 cDailyLoc_full <- m_stdLoc_full %>% group_by(SoNum) %>% 
   mutate(id = cur_group_id(), firstDate = min(Date)) %>% ungroup()
 cDailyLoc_full$InitialAge <- as.integer((cDailyLoc_full$firstDate - 
@@ -241,7 +241,8 @@ durations$InitialAge <- cut(durations$InitialAge,
                                                       "50 - 59", "60+"))
 durations <- merge(durations, dates_full[, c("Date", "DayNum")], 
                    by.x = "firstDay", by.y = "DayNum")
-durations <- merge(durations, cDailyLoc_full, by = c("id", "Date"))
+durations <- merge(durations, cDailyLoc_full[, c("id", "Date", "Location")], 
+                   by = c("id", "Date"))
 durations$InitialFloor <- substr(durations$Location, 0, 1)
 
 #Find mean active spell duration overall
@@ -258,19 +259,19 @@ durations2$InitialFloor <- paste("Floor", durations2$InitialFloor)
 names(durations2)[names(durations2) == "InitialFloor"] <- 'category'
 
 #Find mean active spell duration by race
-durations3 <- durations %>% group_by(startCensored, endCensored, Race.x) %>% 
+durations3 <- durations %>% group_by(startCensored, endCensored, Race) %>% 
   summarise(meanDur = mean(duration), numSpells = n(), 
             meanNumLocs = mean(numLocs), .groups = "drop_last")
-durations3$Race.x <- paste("Race", durations3$Race.x)
-names(durations3)[names(durations3) == 'Race.x'] <- 'category'
+durations3$Race <- paste("Race", durations3$Race)
+names(durations3)[names(durations3) == 'Race'] <- 'category'
 
 #Find mean active spell duration by age
 durations4 <- durations %>% 
-  group_by(startCensored, endCensored, InitialAge.x) %>% 
+  group_by(startCensored, endCensored, InitialAge) %>% 
   summarise(meanDur = mean(duration), numSpells = n(), 
             meanNumLocs = mean(numLocs), .groups = "drop_last")
-durations4$InitialAge.x <- paste("Age", durations4$InitialAge.x)
-names(durations4)[names(durations4) == 'InitialAge.x'] <- 'category'
+durations4$InitialAge <- paste("Age", durations4$InitialAge)
+names(durations4)[names(durations4) == 'InitialAge'] <- 'category'
 
 #Combine and print
 durationsSummary <- rbind(durations1, durations2, durations3, durations4)
