@@ -6,6 +6,8 @@ output: html_document
 ---
 
 ```{r}
+#CELL-LEVEL
+
 temp1 <- cEdges[ ,c("head", "tail", "onset", "terminus")]
 temp2 <- cEdges[ ,c("head", "tail", "onset", "terminus")]
 temp2[1:2] <- temp2[2:1]
@@ -30,7 +32,7 @@ doubledEdges$tail.age <- cut(doubledEdges$InitialAge,
 doubledEdges$InitialAge <- NULL
 ```
 
-#### Age Mixing on `r as.character(firstDay)` (Numbers)
+#### Cell-Level Age Mixing on `r as.character(firstDay)` (Numbers)
 
 ```{r}
 #On First Day
@@ -48,7 +50,7 @@ time1.props.mat <- time1.props %>% pivot_wider(names_from = tail.age,
                                                values_from = propEdges)
 ```
 
-#### Age Mixing on `r as.character(lastDay)` (Numbers)
+#### Cell-Level Age Mixing on `r as.character(lastDay)` (Numbers)
 
 ```{r}
 #On Last Day
@@ -76,7 +78,8 @@ g1 <- ggplot(time1, aes(x = head.age, y = tail.age, z = numEdges,
                         fill = numEdges)) +
   geom_raster(interpolate = T) +
   scale_fill_gradientn(colors = cols, limits = c(minval, maxval)) +
-  ggtitle(paste0("Age Mixing on ", as.character(firstDay), " (Numbers)")) +
+  ggtitle(paste0("Cell-Level Age Mixing on ", as.character(firstDay), 
+                 " (Numbers)")) +
   xlab("Age of Individual") + ylab("Age of Cellmate") +
   labs(fill = "# of Edges")
 print(g1)
@@ -85,7 +88,8 @@ g2 <- ggplot(timen, aes(x = head.age, y = tail.age, z = numEdges,
                         fill = numEdges)) +
   geom_raster(interpolate = T) +
   scale_fill_gradientn(colors = cols, limits = c(minval, maxval)) +
-  ggtitle(paste0("Age Mixing on ", as.character(lastDay), " (Numbers)")) +
+  ggtitle(paste0("Cell-Level Age Mixing on ", as.character(lastDay), 
+                 " (Numbers)")) +
   xlab("Age of Individual") + ylab("Age of Cellmate") +
   labs(fill = "# of Edges")
 print(g2)
@@ -98,7 +102,8 @@ g3 <- ggplot(time1.props, aes(x = head.age, y = tail.age, z = propEdges,
                         fill = propEdges)) +
   geom_raster(interpolate = T) +
   scale_fill_gradientn(colors = cols, limits = c(minval, maxval)) +
-  ggtitle(paste0("Age Mixing on ", as.character(firstDay), " (Proportions)")) +
+  ggtitle(paste0("Cell-Level Age Mixing on ", as.character(firstDay), 
+                 " (Proportions)")) +
   xlab("Age of Individual") + ylab("Age of Cellmate") +
   labs(fill = "Prop. of Edges")
 print(g3)
@@ -107,7 +112,8 @@ g4 <- ggplot(timen.props, aes(x = head.age, y = tail.age, z = propEdges,
                         fill = propEdges)) +
   geom_raster(interpolate = T) +
   scale_fill_gradientn(colors = cols, limits = c(minval, maxval)) +
-  ggtitle(paste0("Age Mixing on ", as.character(lastDay), " (Proportions)")) +
+  ggtitle(paste0("Cell-Level Age Mixing on ", as.character(lastDay), 
+                 " (Proportions)")) +
   xlab("Age of Individual") + ylab("Age of Cellmate") +
   labs(fill = "Prop. of Edges")
 print(g4)
@@ -122,8 +128,9 @@ g5 <- ggplot(diff, aes(x = head.age, y = tail.age, z = numEdges,
                        fill = numEdges)) +
   geom_raster(interpolate = T) +
   scale_fill_gradientn(colors = cols, limits = c(minval, maxval)) +
-  ggtitle(paste0("Change in Age Mixing from ", as.character(firstDay), " to ", 
-                 as.character(lastDay), " (Numbers)")) +
+  ggtitle(paste0("Change in Cell-Level Age Mixing from ", 
+                 as.character(firstDay), " to ", as.character(lastDay), 
+                 " (Numbers)")) +
   xlab("Age of Individual") + ylab("Age of Cellmate") +
   labs(fill = "Change in #")
 print(g5)
@@ -138,11 +145,163 @@ g6 <- ggplot(diff.props, aes(x = head.age, y = tail.age, z = propEdges,
                        fill = propEdges)) +
   geom_raster(interpolate = T) +
   scale_fill_gradientn(colors = cols, limits = c(minval, maxval)) +
-  ggtitle(paste0("Change in Age Mixing from ", as.character(firstDay), " to ", 
-                 as.character(lastDay), " (Proportions)")) +
+  ggtitle(paste0("Change in Cell-Level Age Mixing from ", 
+                 as.character(firstDay), " to ", as.character(lastDay), 
+                 " (Proportions)")) +
   xlab("Age of Individual") + ylab("Age of Cellmate") +
   labs(fill = "Change in Prop.")
 print(g6)
 
-remove(g1, g2, g3, g4, g5, g6)
+remove(g1, g2, g3, g4, g5, g6, doubledEdges)
+```
+
+
+```{r}
+#BLOCK-LEVEL
+
+temp1 <- bEdges[ ,c("head", "tail", "onset", "terminus")]
+temp2 <- bEdges[ ,c("head", "tail", "onset", "terminus")]
+temp2[1:2] <- temp2[2:1]
+
+doubledEdges <- rbind(temp1, temp2)
+remove(temp1, temp2)
+doubledEdges <- merge(doubledEdges, ids[, c("id", "InitialAge")],
+                         by.x = "head", by.y = "id")
+doubledEdges$head.age <- cut(doubledEdges$InitialAge,
+                             breaks=c(0, 20, 30, 40, 50, 60, 100),
+                             right = FALSE, labels = c("Under 20", "20 - 29",
+                                                       "30 - 39", "40 - 49",
+                                                       "50 - 59", "60+"))
+doubledEdges$InitialAge <- NULL
+doubledEdges <- merge(doubledEdges, ids[, c("id", "InitialAge")],
+                      by.x = "tail", by.y = "id")
+doubledEdges$tail.age <- cut(doubledEdges$InitialAge,
+                             breaks=c(0, 20, 30, 40, 50, 60, 100),
+                             right = FALSE, labels = c("Under 20", "20 - 29",
+                                                       "30 - 39", "40 - 49",
+                                                       "50 - 59", "60+"))
+doubledEdges$InitialAge <- NULL
+```
+
+#### Block-Level Age Mixing on `r as.character(firstDay)` (Numbers)
+
+```{r}
+#On First Day
+time1 <- doubledEdges[doubledEdges$onset == -Inf, ]
+time1 <- time1 %>% group_by(head.age, tail.age) %>% 
+  summarise(numEdges = n(), .groups = "drop_last")
+time1.mat <- time1 %>% pivot_wider(names_from = tail.age, 
+                                   values_from = numEdges)
+knitr::kable(time1.mat)
+
+time1.props <- time1 %>% group_by(head.age) %>%
+  mutate(propEdges = numEdges / sum(numEdges))
+time1.props$numEdges <- NULL
+time1.props.mat <- time1.props %>% pivot_wider(names_from = tail.age, 
+                                               values_from = propEdges)
+```
+
+#### Block-Level Age Mixing on `r as.character(lastDay)` (Numbers)
+
+```{r}
+#On Last Day
+timen <- doubledEdges[doubledEdges$terminus == Inf, ]
+timen <- timen %>% group_by(head.age, tail.age) %>%
+  summarise(numEdges = n(), .groups = "drop_last")
+timen.mat <- timen %>%
+  pivot_wider(names_from = tail.age, values_from = numEdges)
+knitr::kable(timen.mat)
+
+timen.props <- timen %>% group_by(head.age) %>%
+  mutate(propEdges = numEdges / sum(numEdges))
+timen.props$numEdges <- NULL
+timen.props.mat <- timen.props %>% pivot_wider(names_from = tail.age, 
+                                               values_from = propEdges)
+```
+
+```{r}
+#Plot number of edges
+cols = rev(colorRampPalette(c('darkred','red','blue','lightblue'))(24))
+minval <- min(min(time1$numEdges), min(timen$numEdges))
+maxval <- max(max(time1$numEdges), max(timen$numEdges))
+
+g1 <- ggplot(time1, aes(x = head.age, y = tail.age, z = numEdges, 
+                        fill = numEdges)) +
+  geom_raster(interpolate = T) +
+  scale_fill_gradientn(colors = cols, limits = c(minval, maxval)) +
+  ggtitle(paste0("Block-Level Age Mixing on ", as.character(firstDay), 
+                 " (Numbers)")) +
+  xlab("Age of Individual") + ylab("Age of Contact") +
+  labs(fill = "# of Edges")
+print(g1)
+
+g2 <- ggplot(timen, aes(x = head.age, y = tail.age, z = numEdges, 
+                        fill = numEdges)) +
+  geom_raster(interpolate = T) +
+  scale_fill_gradientn(colors = cols, limits = c(minval, maxval)) +
+  ggtitle(paste0("Block-Level Age Mixing on ", as.character(lastDay), 
+                 " (Numbers)")) +
+  xlab("Age of Individual") + ylab("Age of Contact") +
+  labs(fill = "# of Edges")
+print(g2)
+
+#Plot proportion of edges
+minval <- min(min(time1.props$propEdges), min(timen.props$propEdges))
+maxval <- max(max(time1.props$propEdges), max(timen.props$propEdges))
+
+g3 <- ggplot(time1.props, aes(x = head.age, y = tail.age, z = propEdges,
+                        fill = propEdges)) +
+  geom_raster(interpolate = T) +
+  scale_fill_gradientn(colors = cols, limits = c(minval, maxval)) +
+  ggtitle(paste0("Block-Level Age Mixing on ", as.character(firstDay), 
+                 " (Proportions)")) +
+  xlab("Age of Individual") + ylab("Age of Contact") +
+  labs(fill = "Prop. of Edges")
+print(g3)
+
+g4 <- ggplot(timen.props, aes(x = head.age, y = tail.age, z = propEdges,
+                        fill = propEdges)) +
+  geom_raster(interpolate = T) +
+  scale_fill_gradientn(colors = cols, limits = c(minval, maxval)) +
+  ggtitle(paste0("Block-Level Age Mixing on ", as.character(lastDay), 
+                 " (Proportions)")) +
+  xlab("Age of Individual") + ylab("Age of Contact") +
+  labs(fill = "Prop. of Edges")
+print(g4)
+
+#Plot difference (number of edges)
+diff <- time1
+diff$numEdges <- timen$numEdges - time1$numEdges
+minval <- min(diff$numEdges)
+maxval <- max(diff$numEdges)
+
+g5 <- ggplot(diff, aes(x = head.age, y = tail.age, z = numEdges, 
+                       fill = numEdges)) +
+  geom_raster(interpolate = T) +
+  scale_fill_gradientn(colors = cols, limits = c(minval, maxval)) +
+  ggtitle(paste0("Change in Block-Level Age Mixing from ", 
+                 as.character(firstDay), " to ", as.character(lastDay), 
+                 " (Numbers)")) +
+  xlab("Age of Individual") + ylab("Age of Contact") +
+  labs(fill = "Change in #")
+print(g5)
+
+#Plot difference (proportion of edges)
+diff.props <- time1.props
+diff.props$propEdges <- timen.props$propEdges - time1.props$propEdges
+minval <- min(diff.props$propEdges)
+maxval <- max(diff.props$propEdges)
+
+g6 <- ggplot(diff.props, aes(x = head.age, y = tail.age, z = propEdges, 
+                       fill = propEdges)) +
+  geom_raster(interpolate = T) +
+  scale_fill_gradientn(colors = cols, limits = c(minval, maxval)) +
+  ggtitle(paste0("Change in Block-Level Age Mixing from ", 
+                 as.character(firstDay), " to ", as.character(lastDay), 
+                 " (Proportions)")) +
+  xlab("Age of Individual") + ylab("Age of Contact") +
+  labs(fill = "Change in Prop.")
+print(g6)
+
+remove(g1, g2, g3, g4, g5, g6, doubledEdges)
 ```
