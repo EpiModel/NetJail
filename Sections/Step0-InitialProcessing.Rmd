@@ -128,13 +128,13 @@ ids2$InitialAge <- cut(ids2$InitialAge, breaks=c(0, 20, 30, 40, 50, 60, 100),
 ids2[ids2$Race != "White" & ids2$Race != "Black", ]$Race <- "Other"
 ids2 <- rename(ids2,c('Age'='InitialAge'))
 
-# knitr::kable(table(ids2$Gender), 
-#              caption = "Total # of Residents by Gender", 
+# knitr::kable(table(ids2$Gender),
+#              caption = "Total # of Residents by Gender",
 #              col.names = c("Gender", "Freq"))
-# knitr::kable(table(ids2$Race), 
+# knitr::kable(table(ids2$Race),
 #              caption = "Total # of Residents by Race",
 #              col.names = c("Race", "Freq"))
-# knitr::kable(table(ids2$Age), 
+# knitr::kable(table(ids2$Age),
 #              caption = "Total # of Residents by Age",
 #              col.names = c("Age Group", "Freq"))
 

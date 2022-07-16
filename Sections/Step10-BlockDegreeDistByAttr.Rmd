@@ -93,7 +93,7 @@ if (exists("bDynNW")) {
 }  
 ```
 
-#### Block-Level Degree Distributions for Selected Floors & Time Points'
+#### Block-Level Degree Distributions for Selected Floors & Time Points
 
 ```{r}
 #Histograms of degree distribution by floor:
@@ -157,16 +157,16 @@ bDegDists_floor2 <- gather(bDegDists_floor, key = "Date", value = "Number",
 bDegDists_floor2$Date <- as.Date(bDegDists_floor2$Date)
 bDegDists_floor2 <- bDegDists_floor2[complete.cases(bDegDists_floor2), ]
 bMeanDeg_floor <- bDegDists_floor2 %>% group_by(floor, Date) %>% 
-  summarise(MeanDeg = weighted.mean(degree, Number), 
-            SD = SD(degree, weights = Number), min = min(degree), 
+  summarise(bMeanDeg = weighted.mean(degree, Number), 
+            sd = SD(degree, weights = Number), min = min(degree), 
             max = max(degree), .groups = "drop_last")
 par(mfrow = c(2,2))
 floors <- 1:7
-max.y <- ceiling(max(bMeanDeg_floor$MeanDeg) * 10) / 10
-min.y <- floor(min(bMeanDeg_floor$MeanDeg) * 10) / 10
+max.y <- ceiling(max(bMeanDeg_floor$bMeanDeg) * 10) / 10
+min.y <- floor(min(bMeanDeg_floor$bMeanDeg) * 10) / 10
 for (i in seq_along(floors)) {
   plot(bMeanDeg_floor[bMeanDeg_floor$floor == floors[i], ]$Date, 
-       y = bMeanDeg_floor[bMeanDeg_floor$floor == floors[i], ]$MeanDeg,
+       y = bMeanDeg_floor[bMeanDeg_floor$floor == floors[i], ]$bMeanDeg,
        xlab = "Date", ylab = "Mean Degree", 
        main = paste("Mean degree over time for floor", floors[i], sep=" "),
        ylim = c(min.y, max.y))
@@ -177,8 +177,8 @@ min.y <- min(bMeanDeg_floor$min)
 for (i in seq_along(floors)){
   temp <- bMeanDeg_floor[bMeanDeg_floor$floor == floors[i], ]
   g <- (ggplot(temp,aes(x=Date)) + 
-          geom_boxplot(aes(lower=(MeanDeg-SD), upper=(MeanDeg+SD), 
-                           middle=MeanDeg, ymin=min, ymax=max, group = Date), 
+          geom_boxplot(aes(lower=(bMeanDeg-sd), upper=(bMeanDeg+sd), 
+                           middle=bMeanDeg, ymin=min, ymax=max, group = Date), 
                        stat="identity") + 
           ggtitle(paste("Mean degree over time for floor", floors[i], 
                         sep=" ")) + 
@@ -199,16 +199,16 @@ bDegDists_race2 <- gather(bDegDists_race, key = "Date", value = "Number",
 bDegDists_race2$Date <- as.Date(bDegDists_race2$Date)
 bDegDists_race2 <- bDegDists_race2[complete.cases(bDegDists_race2), ]
 bMeanDeg_race <- bDegDists_race2 %>% group_by(race, Date) %>% 
-  summarise(MeanDeg = weighted.mean(degree, Number), 
-            SD = SD(degree, weights = Number), min = min(degree),
+  summarise(bMeanDeg = weighted.mean(degree, Number), 
+            sd = SD(degree, weights = Number), min = min(degree),
             max = max(degree), .groups = "drop_last")
 races <- c("Black", "White", "Other")
-max.y <- ceiling(max(bMeanDeg_race$MeanDeg) * 10) / 10
-min.y <- floor(min(bMeanDeg_race$MeanDeg) * 10) / 10
+max.y <- ceiling(max(bMeanDeg_race$bMeanDeg) * 10) / 10
+min.y <- floor(min(bMeanDeg_race$bMeanDeg) * 10) / 10
 par(mfrow = c(2,2))
 for (i in seq_along(races)) {
   plot(bMeanDeg_race[bMeanDeg_race$race == races[i], ]$Date,
-       y = bMeanDeg_race[bMeanDeg_race$race == races[i], ]$MeanDeg,
+       y = bMeanDeg_race[bMeanDeg_race$race == races[i], ]$bMeanDeg,
        xlab = "Date", ylab = "Mean Degree", 
        main = paste("Mean Deg. over Time -", races[i], sep = " "),
        ylim = c(min.y, max.y)) 
@@ -219,8 +219,8 @@ max.y <- max(bMeanDeg_race$max)
 for (i in seq_along(races)){
   temp <- bMeanDeg_race[bMeanDeg_race$race == races[i], ]
   g <- (ggplot(temp,aes(x=Date)) + 
-          geom_boxplot(aes(lower=(MeanDeg-SD), upper=(MeanDeg+SD), 
-                           middle=MeanDeg, ymin=min, ymax=max, group = Date), 
+          geom_boxplot(aes(lower=(bMeanDeg-sd), upper=(bMeanDeg+sd), 
+                           middle=bMeanDeg, ymin=min, ymax=max, group = Date), 
                        stat="identity") + 
           ggtitle(paste("Mean degree over time -", races[i], sep=" ")) + 
           xlab("Date") + ylab("Degree") + ylim(min.y, max.y))
@@ -239,17 +239,17 @@ bDegDists_age2 <- gather(bDegDists_age, key = "Date", value = "Number",
 bDegDists_age2$Date <- as.Date(bDegDists_age2$Date)
 bDegDists_age2 <- bDegDists_age2[complete.cases(bDegDists_age2), ]
 bMeanDeg_age <- bDegDists_age2 %>% group_by(age, Date) %>% 
-  summarise(MeanDeg = weighted.mean(degree, Number), 
-            SD = SD(degree, weights = Number), min = min(degree),
+  summarise(bMeanDeg = weighted.mean(degree, Number), 
+            sd = SD(degree, weights = Number), min = min(degree),
             max = max(degree), .groups = "drop_last")
 ages <- c("Under 20", "20 - 29", "30 - 39", "40 - 49", "50 - 59", "60+")
-max.y <- ceiling(max(bMeanDeg_age$MeanDeg) * 10) / 10
-min.y <- floor(min(bMeanDeg_age$MeanDeg) * 10) / 10
+max.y <- ceiling(max(bMeanDeg_age$bMeanDeg) * 10) / 10
+min.y <- floor(min(bMeanDeg_age$bMeanDeg) * 10) / 10
 par(mfrow = c(2,2))
 plot.new()
 for (i in seq_along(ages)) {
   plot(bMeanDeg_age[bMeanDeg_age$age == ages[i], ]$Date,
-       y = bMeanDeg_age[bMeanDeg_age$age == ages[i], ]$MeanDeg,
+       y = bMeanDeg_age[bMeanDeg_age$age == ages[i], ]$bMeanDeg,
        xlab = "Date", ylab = "Mean Degree", 
        main = paste("Mean Deg. over Time - Age", ages[i], 
                     sep = " "), 
@@ -261,8 +261,8 @@ max.y <- max(bMeanDeg_age$max)
 for (i in seq_along(ages)){
   temp <- bMeanDeg_age[bMeanDeg_age$age == ages[i], ]
   g <- (ggplot(temp,aes(x=Date)) + 
-          geom_boxplot(aes(lower=(MeanDeg-SD), upper=(MeanDeg+SD), 
-                           middle=MeanDeg, ymin=min, ymax=max, group = Date), 
+          geom_boxplot(aes(lower=(bMeanDeg-sd), upper=(bMeanDeg+sd), 
+                           middle=bMeanDeg, ymin=min, ymax=max, group = Date), 
                        stat="identity") + 
           ggtitle(paste("Mean degree over time - Age", ages[i], sep=" ")) +
           xlab("Date") + ylab("Degree") + ylim(min.y, max.y))
@@ -278,8 +278,8 @@ remove(bDegDists_age2, a1, a2, a3, a4, a5, a6, g, temp)
 ```{r}
 #Mean degree by floor averaged across all data
 bOverallMeanDeg_floor <- bMeanDeg_floor %>% group_by(floor) %>% 
-  summarise(OverallMeanDeg = mean(MeanDeg), sd = sd(MeanDeg), 
-            min = min(MeanDeg), max = max(MeanDeg))
+  summarise(OverallMeanDeg = mean(bMeanDeg), sd = sd(bMeanDeg), 
+            min = min(bMeanDeg), max = max(bMeanDeg))
 par(mfrow = c(1,1))
 g <- ggplot(bOverallMeanDeg_floor,aes(x=floor)) + 
   geom_boxplot(aes(lower=(OverallMeanDeg-sd), upper=(OverallMeanDeg+sd), 
@@ -293,8 +293,8 @@ remove(g)
 
 #Mean degree by race averaged across all data 
 bOverallMeanDeg_race <- bMeanDeg_race %>% group_by(race) %>% 
-  summarise(OverallMeanDeg = mean(MeanDeg), sd = sd(MeanDeg), 
-            min = min(MeanDeg), max = max(MeanDeg))
+  summarise(OverallMeanDeg = mean(bMeanDeg), sd = sd(bMeanDeg), 
+            min = min(bMeanDeg), max = max(bMeanDeg))
 par(mfrow = c(1,1))
 g <- ggplot(bOverallMeanDeg_race,aes(x=race)) + 
   geom_boxplot(aes(lower=(OverallMeanDeg-sd), upper=(OverallMeanDeg+sd), 
@@ -308,8 +308,8 @@ remove(g)
 
 #Mean degree by age across all data
 bOverallMeanDeg_age <- bMeanDeg_age %>% group_by(age) %>% 
-  summarise(OverallMeanDeg = mean(MeanDeg), sd = sd(MeanDeg),
-            min = min(MeanDeg), max = max(MeanDeg))
+  summarise(OverallMeanDeg = mean(bMeanDeg), sd = sd(bMeanDeg),
+            min = min(bMeanDeg), max = max(bMeanDeg))
 par(mfrow = c(1,1))
 g <- ggplot(bOverallMeanDeg_age,aes(x=age)) + 
   geom_boxplot(aes(lower=(OverallMeanDeg-sd), upper=(OverallMeanDeg+sd), 
