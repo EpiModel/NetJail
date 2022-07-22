@@ -7,7 +7,8 @@ output: html_document
 
 ```{r}
 turnover_rates <- data.frame(Category = rows, Admissions=NA, Releases=NA, 
-                             AveragePop = NA, TurnoverIn = NA, TurnoverOut = NA)
+                             PersonDaysA = NA, PersonDaysR = NA,
+                             TurnoverIn = NA, TurnoverOut = NA)
 
 #OVERALL
 #Calculate # of new admissions (including repeat admissions)
@@ -19,7 +20,9 @@ releases <- sum(activeDays$terminus < Inf)
 turnover_rates[turnover_rates$Category == "Overall", ]$Releases <- releases
 
 #Find average daily population
-turnover_rates[turnover_rates$Category == "Overall", ]$AveragePop <- avg_pop
+turnover_rates[turnover_rates$Category == "Overall", ]$PersonDaysR <- pd
+pd2 <- nrow(m_stdLoc[m_stdLoc$Date > dates$Date[1], ])
+turnover_rates[turnover_rates$Category == "Overall", ]$PersonDaysA <- pd2
 remove(admissions, releases)
 
 #BY RACE
@@ -31,14 +34,17 @@ for (i in seq_along(allRaces)) {
                       activeDays_race$onset > -Inf)
   releases <- sum(activeDays_race$Race == allRaces[i] & 
                       activeDays_race$terminus < Inf)
-  avg_pop <- mean(colSums(cDegDists_race[cDegDists_race$race == 
-                                           allRaces[i],-c(1,2)], na.rm = TRUE))
+  pd1 <- sum(colSums(cDegDists_race[cDegDists_race$race == allRaces[i],
+                                    -c(1,2,3)], na.rm = TRUE))
+  pd2 <- sum(colSums(cDegDists_race[cDegDists_race$race ==allRaces[i],
+                                    -c(1,2,ncol(cDegDists_race))], na.rm = TRUE))
   turnover_rates[turnover_rates$Category == allRaces[i], ]$Admissions <- 
     admissions
   turnover_rates[turnover_rates$Category == allRaces[i], ]$Releases <- releases
-  turnover_rates[turnover_rates$Category == allRaces[i], ]$AveragePop <- avg_pop
+  turnover_rates[turnover_rates$Category == allRaces[i], ]$PersonDaysA <- pd1
+  turnover_rates[turnover_rates$Category == allRaces[i], ]$PersonDaysR <- pd2
 }
-remove(admissions, releases)
+remove(admissions, releases, pd1, pd2)
 
 #BY AGE
 activeDays_age <- merge(activeDays, ids[ , c("id", "InitialAge")], by = "id")
@@ -52,16 +58,20 @@ activeDays_age$InitialAge <- cut(activeDays_age$InitialAge,
                       activeDays_age$onset > -Inf)
   releases <- sum(activeDays_age$InitialAge == allAges[i] & 
                       activeDays_age$terminus < Inf)
-  avg_pop <- mean(colSums(cDegDists_age[cDegDists_age$age == 
-                                           allAges[i],-c(1,2)], na.rm = TRUE))
+  pd1 <- sum(colSums(cDegDists_age[cDegDists_age$age == allAges[i],
+                                   -c(1,2,3)], na.rm = TRUE))
+  pd2 <- sum(colSums(cDegDists_age[cDegDists_age$age == allAges[i],
+                                   -c(1,2,ncol(cDegDists_age))], na.rm = TRUE))
   turnover_rates[turnover_rates$Category == 
                    paste("Age", allAges[i], sep=" "), ]$Admissions <- admissions
   turnover_rates[turnover_rates$Category == 
                    paste("Age", allAges[i], sep=" "), ]$Releases <- releases
   turnover_rates[turnover_rates$Category == 
-                   paste("Age", allAges[i], sep=" "), ]$AveragePop <- avg_pop
+                   paste("Age", allAges[i], sep=" "), ]$PersonDaysA <- pd1
+  turnover_rates[turnover_rates$Category == 
+                   paste("Age", allAges[i], sep=" "), ]$PersonDaysR <- pd2
 }
-remove(admissions, releases, avg_pop)
+remove(admissions, releases, pd1, pd2)
 
 #BY FLOOR
 #Calculate admissions by floor
@@ -87,20 +97,24 @@ turnover_rates[grepl("Floor", turnover_rates$Category), ]$Releases <-
   releases_f$releases
 remove(releases_f)
 
-#Calculate average population size by floor
+#Calculate person-days  by floor
 for (i in seq_along(allFloors)){
-  avg_pop <- mean(colSums(cDegDists_floor[cDegDists_floor$floor == allFloors[i], 
-                                          -c(1,2)], na.rm = TRUE))
+  pd1 <- sum(colSums(cDegDists_floor[cDegDists_floor$floor == allFloors[i], 
+                                          -c(1,2,3)], na.rm = TRUE))
+  pd2 <- sum(colSums(cDegDists_floor[cDegDists_floor$floor == allFloors[i], 
+                                          -c(1,2,ncol(cDegDists_floor))], 
+                     na.rm = TRUE))
   turnover_rates[turnover_rates$Category == 
-                   paste("Floor", allFloors[i], sep=" "), ]$AveragePop <- 
-    avg_pop
+                   paste("Floor", allFloors[i], sep=" "), ]$PersonDaysA <- pd1
+  turnover_rates[turnover_rates$Category == 
+                   paste("Floor", allFloors[i], sep=" "), ]$PersonDaysR <- pd2
 }
-remove(avg_pop)
+remove(pd1, pd2)
 
 #Calculate turnover rates and print
-turnover_rates$TurnoverIn <- (turnover_rates$Admissions / 
-                                turnover_rates$AveragePop) / max(dates$DayNum) 
-turnover_rates$TurnoverOut <- (turnover_rates$Releases / 
-                                turnover_rates$AveragePop) / max(dates$DayNum) 
+turnover_rates$TurnoverIn <- turnover_rates$Admissions / 
+  turnover_rates$PersonDaysA
+turnover_rates$TurnoverOut <- turnover_rates$Releases / 
+  turnover_rates$PersonDaysR 
 knitr::kable(turnover_rates[ ,c("Category", "TurnoverOut")], digits = 3)
 ```

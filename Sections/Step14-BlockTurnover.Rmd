@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r}
-block_changes <- data.frame(Category = rows, LocChanges=NA, AveragePop=NA, 
+block_changes <- data.frame(Category = rows, LocChanges=NA, PersonDays=NA, 
                            BlockChangeRate = NA, ChangesWInFloor = NA, 
                            ChangesWInFloorTower = NA, PercentWInFloor = NA, 
                            PercentWInFloorTower = NA)
@@ -19,8 +19,8 @@ locChanges <- anti_join(bLocs, activeDays, by = c("id", "terminus"))
 block_changes[block_changes$Category == "Overall", ]$LocChanges <- 
   nrow(locChanges)
 
-#Find the average active population size
-block_changes[block_changes$Category == "Overall", ]$AveragePop <- avg_pop
+#Find the number of person-days (excluding the last Day)
+block_changes[block_changes$Category == "Overall", ]$PersonDays <- pd
 
 #BY ATTRIBUTE
 locChanges <- merge(locChanges, ids[ , c("id", "Race", "InitialAge")], 
@@ -41,34 +41,33 @@ locChanges_floor <- locChanges %>% group_by(Floor) %>%
 for (i in seq_along(allRaces)) {
   block_changes[block_changes$Category == allRaces[i], ]$LocChanges <- 
     locChanges_race[locChanges_race$Race == allRaces[i], ]$locChanges
-  block_changes[block_changes$Category == allRaces[i], ]$AveragePop <- 
-    mean(colSums(bDegDists_race[bDegDists_race$race == 
-                                           allRaces[i],-c(1,2)], na.rm = TRUE))
+  block_changes[block_changes$Category == allRaces[i], ]$PersonDays <- 
+    sum(colSums(bDegDists_race[bDegDists_race$race == allRaces[i],
+                               -c(1,2,ncol(bDegDists_race))], na.rm = TRUE))
 }
 for (i in seq_along(allAges)) {
   block_changes[block_changes$Category == 
                  paste("Age", allAges[i], sep=" "), ]$LocChanges <- 
     locChanges_age[locChanges_age$InitialAge == allAges[i], ]$locChanges
   block_changes[block_changes$Category == 
-                 paste("Age", allAges[i], sep=" "), ]$AveragePop <- 
-    mean(colSums(bDegDists_age[bDegDists_age$age == 
-                                           allAges[i],-c(1,2)], na.rm = TRUE))
+                 paste("Age", allAges[i], sep=" "), ]$PersonDays <- 
+    sum(colSums(bDegDists_age[bDegDists_age$age == allAges[i],
+                              -c(1,2,ncol(bDegDists_age))], na.rm = TRUE))
 }
 for (i in seq_along(allFloors)) {
   block_changes[block_changes$Category == 
                  paste("Floor", allFloors[i], sep=" "), ]$LocChanges <- 
     locChanges_floor[locChanges_floor$Floor == allFloors[i], ]$locChanges
   block_changes[block_changes$Category == 
-                 paste("Floor", allFloors[i], sep=" "), ]$AveragePop <- 
-    mean(colSums(bDegDists_floor[bDegDists_floor$floor == 
-                                           allFloors[i],-c(1,2)], na.rm = TRUE))
+                 paste("Floor", allFloors[i], sep=" "), ]$PersonDays <- 
+    sum(colSums(bDegDists_floor[bDegDists_floor$floor == allFloors[i],
+                                -c(1,2,ncol(bDegDists_floor))], na.rm = TRUE))
 }
 remove(locChanges_age, locChanges_floor, locChanges_race)
 
 #Calculate turnover rates and print
-block_changes$BlockChangeRate <- (block_changes$LocChanges / 
-                                block_changes$AveragePop) / max(dates$DayNum) 
-#knitr::kable(block_changes[ ,c("Category", "BlockChangeRate")])
+block_changes$BlockChangeRate <- block_changes$LocChanges / 
+  block_changes$PersonDays
 
 #Break down block changes by changes to a new block vs. tower/floor
 bLocs2 <- bLocs;
