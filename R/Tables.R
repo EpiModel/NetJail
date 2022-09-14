@@ -328,7 +328,7 @@ filenames <- list.files("data/output/turnover/Jan", pattern="*.RData",
                         full.names=TRUE)
 lapply(filenames,load,.GlobalEnv)
 
-changes.Jan <- cbind(cell_changes[, c(1, 4)], block_changes[, c(1, 4)], turnover_rates[, c(1, 6)])
+changes.Jan <- cbind(cell_changes[, c(1, 4)], block_changes[, c(1, 4)], turnover_rates[, c(1, 7)])
 changes.Jan[, c(3, 5)] <- NULL
 
 rm(list=setdiff(ls(), c("table1", "table2", "changes.Jan")))
@@ -338,7 +338,7 @@ filenames <- list.files("data/output/turnover/Apr", pattern="*.RData",
                         full.names=TRUE)
 lapply(filenames,load,.GlobalEnv)
 
-changes.Apr <- cbind(cell_changes[, c(1, 4)], block_changes[, c(1, 4)], turnover_rates[, c(1, 6)])
+changes.Apr <- cbind(cell_changes[, c(1, 4)], block_changes[, c(1, 4)], turnover_rates[, c(1, 7)])
 changes.Apr[, c(3, 5)] <- NULL
 
 rm(list=setdiff(ls(), c("table1", "table2", "changes.Jan", "changes.Apr")))
