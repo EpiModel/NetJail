@@ -57,6 +57,8 @@ rm(list=setdiff(ls(), c("bCumContactsJan", "cCumContactsJan", "bCumContactsApr",
 # PLOT --------------------------------------------------------------------
 library(zoo)
 library(reshape2)
+library(ggplot2)
+library(dplyr)
 cCumContactsApr$date <- 1:nrow(cCumContactsApr)
 cCumContactsApr <- rbind(cCumContactsApr, c(nrow(cCumContactsApr) + 1, cCumContactsApr[nrow(cCumContactsApr), 2]))
 cCumContactsJan$date <- 1:nrow(cCumContactsJan)
@@ -68,7 +70,7 @@ cCumContacts <- melt(cCumContacts, id='date')
 cCumContacts <- rename(cCumContacts, Month = variable)
 
 g1 <- ggplot() + geom_step(data = cCumContacts, aes(x = date, y = value, color = Month, group = Month, alpha = Month), size = 1) +
-  xlab("Day") + ylab("Avg. Cumulative Cell-Level Contacts") +
+  xlab("Day") + ylab("Dynamic Cell-Level Degree") +
   scale_color_manual(values=c("darkred", "cornflowerblue")) + scale_alpha_manual(values = c(1, 0.8)) +
   scale_x_continuous(expand = c(0,0),
                      limits = c(1, 12),
@@ -78,7 +80,7 @@ g1 <- ggplot() + geom_step(data = cCumContacts, aes(x = date, y = value, color =
                                 "7" = "Day 7", "9" = "Day 9",
                                 "11" = "Day 11")) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 4)) +
-  ggtitle("Cumulative Cell-Level Contacts")
+  ggtitle("Cell-Level")
 
 bCumContactsApr$date <- 1:nrow(bCumContactsApr)
 bCumContactsApr <- rbind(bCumContactsApr, c(nrow(bCumContactsApr) + 1, bCumContactsApr[nrow(bCumContactsApr), 2]))
@@ -91,7 +93,7 @@ bCumContacts <- melt(bCumContacts, id='date')
 bCumContacts <- rename(bCumContacts, Month = variable)
 
 g2 <- ggplot() + geom_step(data = bCumContacts, aes(x = date, y = value, color = Month, group = Month, alpha = Month), size = 1) +
-  xlab("Day") + ylab("Avg. Cumulative Block-Level Contacts") +
+  xlab("Day") + ylab("Dynamic Block-Level Degree") +
   scale_color_manual(values=c("darkred", "cornflowerblue")) + scale_alpha_manual(values = c(1, 0.8)) +
   scale_x_continuous(expand = c(0,0),
                      limits = c(1, 12),
@@ -101,7 +103,7 @@ g2 <- ggplot() + geom_step(data = bCumContacts, aes(x = date, y = value, color =
                                 "7" = "Day 7", "9" = "Day 9",
                                 "11" = "Day 11")) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50)) +
-  ggtitle("Cumulative Block-Level Contacts")
+  ggtitle("Block-Level")
 
 
 library(patchwork)

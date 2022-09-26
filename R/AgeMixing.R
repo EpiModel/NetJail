@@ -254,3 +254,15 @@ ggsave("AgeMixing.tiff", units="in", width=12, height = 10, dpi=300,
        compression = 'lzw')
 ggsave("AgeMixing.pdf", units="in", width=12, height = 10, dpi=300)
 
+
+# Output in table form ----------------------------------------------------
+library(tidyr)
+bAgeMixing.Apr.mat <- bAgeMixing.Apr %>%
+  pivot_wider(names_from = tail.age...2, values_from = avg.prop)
+bAgeMixing.Jan.mat <- bAgeMixing.Jan %>%
+  pivot_wider(names_from = tail.age...2, values_from = avg.prop)
+cAgeMixing.Apr.mat <- cAgeMixing.Apr %>%
+  pivot_wider(names_from = tail.age...2, values_from = avg.prop)
+cAgeMixing.Jan.mat <- cAgeMixing.Jan %>%
+  pivot_wider(names_from = tail.age...2, values_from = avg.prop)
+

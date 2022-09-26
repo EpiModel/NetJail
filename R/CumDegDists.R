@@ -76,7 +76,7 @@ g1 <- ggplot() + geom_step(data = cCumDist, aes(x = deg, y = value, color = Mont
   scale_color_manual(values=c("darkred", "cornflowerblue")) + scale_alpha_manual(values = c(1, 0.8)) +
   scale_x_continuous(expand = c(0, 0), limits = c(0, max(cCumDist$deg))) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 105)) +
-  ggtitle("Cumulative Cell-Level Degree Distribution")
+  ggtitle("Cell-Level")
 
 bCumDist <- merge(bCumDistJan, bCumDistApr, by = "deg", all = TRUE)
 bCumDist$mean.x[1:7] <- 0
@@ -91,7 +91,7 @@ g2 <- ggplot() + geom_step(data = bCumDist, aes(x = deg, y = value, color = Mont
   scale_color_manual(values=c("darkred", "cornflowerblue")) + scale_alpha_manual(values = c(1, 0.8)) +
   scale_x_continuous(expand = c(0, 0), limits = c(0, max(bCumDist$deg))) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 105)) +
-  ggtitle("Cumulative Block-Level Degree Distribution")
+  ggtitle("Block-Level")
 
 library(patchwork)
 combined <- g1 + g2 & theme(legend.position = "right")
